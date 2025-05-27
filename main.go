@@ -469,9 +469,10 @@ func (m model) chat() tea.Cmd {
 			messages = append(messages, msg.To())
 		}
 		params := openai.ChatCompletionNewParams{
-			Model:    m.config.LLM.Model,
-			Messages: messages,
-			Tools:    m.tools,
+			Model:      m.config.LLM.Model,
+			Messages:   messages,
+			Tools:      m.tools,
+			ToolChoice: openai.ChatCompletionToolChoiceOptionUnionParam{OfAuto: openai.String("auto")},
 		}
 		msg, err := m.llm.Chat.Completions.New(context.Background(), params)
 		if err != nil {
