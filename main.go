@@ -478,12 +478,6 @@ func (m model) chat() tea.Cmd {
 			// TODO: handle error properly
 			log.Error("Failed to get chat completion", "err", err)
 		}
-		// if err != nil {
-		// 	msg = ollama.Message{
-		// 		Content: fmt.Sprintf("Error: %v", err),
-		// 		Role:    notificationRole,
-		// 	}
-		// }
 		return msg
 	}
 }
@@ -539,17 +533,6 @@ func (m model) View() string {
 	return v
 }
 
-func chatMessageRole(msg openai.ChatCompletionMessageParamUnion) string {
-	if msg.OfUser != nil {
-		return userRole
-	} else if msg.OfAssistant != nil {
-		return assistantRole
-	} else if msg.OfTool != nil {
-		return toolRole
-	}
-	panic(fmt.Sprintf("Unknown message type: %#v", msg))
-}
-
 func (m model) messagesView() string {
 	messagesStrs := make([]string, 0, len(m.messages))
 	for _, msg := range m.messages {
@@ -562,12 +545,10 @@ func (m model) messagesView() string {
 		log.Debug("Processing message", "msg", fmt.Sprintf("%#v", msg))
 		switch msg.Role {
 		case userRole:
-			// log.Debug("User message", "content", content)
 			boxPlacement = lipgloss.Right
 			styBox = styBox.Align(boxPlacement).MarginRight(2)
 			content = m.maybeMarkdown(content)
 		case assistantRole:
-			// log.Debug("Assistant message", "content", content)
 			boxPlacement = lipgloss.Left
 			styBox = styBox.Align(boxPlacement).MarginLeft(2)
 			if content != "" {
