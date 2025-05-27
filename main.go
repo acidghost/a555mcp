@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -23,7 +22,8 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
-	ollama "github.com/ollama/ollama/api"
+	"github.com/openai/openai-go"
+	oaiOpts "github.com/openai/openai-go/option"
 	"github.com/spf13/cobra"
 )
 
@@ -100,16 +100,19 @@ type model struct {
 			Command string   `json:"command"`
 			Args    []string `json:"args"`
 		} `json:"servers"`
-		Ollama string `json:"ollama"`
+		LLM struct {
+			URL   string `json:"url"`
+			Model string `json:"model"`
+		} `json:"llm"`
 	}
 
 	clients map[string]client.MCPClient
-	ollama  *ollama.Client
+	llm     openai.Client
 
 	w, h      int
 	isLoading bool
-	tools     []ollama.Tool
-	messages  []ollama.Message
+	tools     []openai.ChatCompletionToolParam
+	messages  []chatMessage
 
 	mdr *glamour.TermRenderer
 
@@ -124,22 +127,24 @@ type model struct {
 	}
 }
 
-// Ollama types extracted from embedded API structs.
-type (
-	OllamaToolFunctionParameters = struct {
-		Type       string                                      `json:"type"`
-		Defs       any                                         `json:"$defs,omitempty"`
-		Items      any                                         `json:"items,omitempty"`
-		Required   []string                                    `json:"required"`
-		Properties map[string]OllamaToolFunctionSchemaProperty `json:"properties"`
+type chatMessage struct {
+	Role      string                                 `json:"role"`
+	Content   string                                 `json:"content"`
+	ToolCalls []openai.ChatCompletionMessageToolCall `json:"tool_calls,omitempty"`
+}
+
+func (m chatMessage) To() openai.ChatCompletionMessageParamUnion {
+	switch m.Role {
+	case userRole:
+		return openai.UserMessage(m.Content)
+	case assistantRole:
+		return openai.AssistantMessage(m.Content)
+	case toolRole:
+		// TODO: set tool call ID
+		return openai.ToolMessage(m.Content, "0")
 	}
-	OllamaToolFunctionSchemaProperty = struct {
-		Type        ollama.PropertyType `json:"type"`
-		Items       any                 `json:"items,omitempty"`
-		Description string              `json:"description"`
-		Enum        []any               `json:"enum,omitempty"`
-	}
-)
+	panic(fmt.Sprintf("Unknown chat message role: %s", m.Role))
+}
 
 func NewModel() (model, error) {
 	var (
@@ -200,16 +205,15 @@ func NewModel() (model, error) {
 		return m, fmt.Errorf("failed to parse config file %q: %w", fRootConfig, err)
 	}
 
-	if m.config.Ollama == "" {
-		return m, fmt.Errorf("ollama URL is not configured in %q", fRootConfig)
+	if m.config.LLM.URL == "" {
+		return m, fmt.Errorf("LLM URL is not configured in %q", fRootConfig)
 	}
-	ollamaURL, err := url.Parse(m.config.Ollama)
-	if err != nil {
-		return m, fmt.Errorf("invalid ollama URL %q: %w", m.config.Ollama, err)
-	}
-	log.Debug("New Ollama client", "url", ollamaURL)
+	log.Debug("New LLM client", "url", m.config.LLM.URL, "model", m.config.LLM.Model)
 	http.DefaultClient.Transport = LoggingHttpTransport{http.DefaultTransport}
-	m.ollama = ollama.NewClient(ollamaURL, http.DefaultClient)
+	m.llm = openai.NewClient(
+		oaiOpts.WithBaseURL(m.config.LLM.URL),
+		oaiOpts.WithHTTPClient(http.DefaultClient),
+	)
 
 	m.clients = make(map[string]client.MCPClient)
 	for name, server := range m.config.Servers {
@@ -224,7 +228,7 @@ func NewModel() (model, error) {
 		initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 		initRequest.Params.ClientInfo = mcp.Implementation{
 			Name:    "a555mcp",
-			Version: "1.0.0",
+			Version: buildVersion,
 		}
 		initRequest.Params.Capabilities = mcp.ClientCapabilities{}
 
@@ -265,7 +269,7 @@ func NewModel() (model, error) {
 					"tool", tool.Name,
 					"desc", ellipsis(tool.Description, 40),
 				)
-				m.tools = append(m.tools, mcpToolToOllama(name, tool))
+				m.tools = append(m.tools, mcpToolToLLM(name, tool))
 			}
 		} else {
 			log.Error("Listing tools", "err", err)
@@ -313,47 +317,19 @@ func (t LoggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	return resp, nil
 }
 
-func mcpToolToOllama(serverName string, tool mcp.Tool) ollama.Tool {
+func mcpToolToLLM(serverName string, tool mcp.Tool) openai.ChatCompletionToolParam {
 	namespacedName := fmt.Sprintf("%s/%s", serverName, tool.Name)
-	return ollama.Tool{
-		Type: "function",
-		Function: ollama.ToolFunction{
+	return openai.ChatCompletionToolParam{
+		Function: openai.FunctionDefinitionParam{
 			Name:        namespacedName,
-			Description: tool.Description,
-			Parameters: OllamaToolFunctionParameters{
-				Type:       tool.InputSchema.Type,
-				Required:   tool.InputSchema.Required,
-				Properties: mcpToolSchemaPropertiesToOllama(tool.InputSchema.Properties),
+			Description: openai.String(tool.Description),
+			Parameters: openai.FunctionParameters{
+				"type":       tool.InputSchema.Type,
+				"required":   tool.InputSchema.Required,
+				"properties": tool.InputSchema.Properties,
 			},
 		},
 	}
-}
-
-func mcpToolSchemaPropertiesToOllama(props map[string]any) map[string]OllamaToolFunctionSchemaProperty {
-	result := make(map[string]OllamaToolFunctionSchemaProperty, len(props))
-	for k, v := range props {
-		if propMap, ok := v.(map[string]any); ok {
-			prop := OllamaToolFunctionSchemaProperty{}
-			switch v := propMap["type"].(type) {
-			case string:
-				prop.Type = []string{v}
-			case []string:
-				prop.Type = v
-			}
-			if desc, ok := propMap["description"].(string); ok {
-				prop.Description = desc
-			}
-			if enumRaw, ok := propMap["enum"].([]any); ok {
-				for _, e := range enumRaw {
-					if str, ok := e.(string); ok {
-						prop.Enum = append(prop.Enum, str)
-					}
-				}
-			}
-			result[k] = prop
-		}
-	}
-	return result
 }
 
 func (m model) Init() tea.Cmd {
@@ -403,9 +379,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Blur()
 				m.isLoading = true
 				m.keys.Enter.SetEnabled(false)
-				m.messages = append(m.messages, ollama.Message{
-					Content: m.input.Value(),
+				m.messages = append(m.messages, chatMessage{
 					Role:    userRole,
+					Content: m.input.Value(),
 				})
 				m.recomputeViewport()
 				m.input.Reset()
@@ -418,15 +394,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, spinnerCmd = m.spinner.Update(msg)
 		return m, spinnerCmd
 
-	case ollama.Message:
+	case *openai.ChatCompletion:
 		log.Debug("LLM", "msg", fmt.Sprintf("%#v", msg))
+		if msg == nil || len(msg.Choices) == 0 {
+			m.isLoading = false
+			m.keys.Enter.SetEnabled(true)
+			m.input.Focus()
+			return m, nil
+		}
+
 		replacer := strings.NewReplacer("<think>", "## Thinking", "</think>", "## Reply")
-		msg.Content = replacer.Replace(msg.Content)
-		m.messages = append(m.messages, msg)
+		content := msg.Choices[0].Message.Content
+		content = replacer.Replace(content)
+		toolCalls := msg.Choices[0].Message.ToolCalls
+		m.messages = append(m.messages, chatMessage{
+			Role:      assistantRole,
+			Content:   content,
+			ToolCalls: toolCalls,
+		})
 		m.recomputeViewport()
-		if msg.Role == assistantRole && len(msg.ToolCalls) > 0 {
+		if len(toolCalls) > 0 {
 			// TODO: ask for confirmation of tool calls
-			return m, m.toolCalls(msg.ToolCalls)
+			return m, m.toolCalls(toolCalls)
 		} else {
 			m.isLoading = false
 			m.keys.Enter.SetEnabled(true)
@@ -446,7 +435,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					log.Debug("Ignoring non-text content in tool call result", "content", c)
 				}
 			}
-			m.messages = append(m.messages, ollama.Message{
+			m.messages = append(m.messages, chatMessage{
 				Role:    toolRole,
 				Content: strings.Join(content, "\n"),
 			})
@@ -470,39 +459,36 @@ func (m *model) recomputeViewport() {
 	m.viewport.GotoBottom()
 }
 
-func (m *model) chat() tea.Cmd {
-	messages := make([]ollama.Message, 0, len(m.messages))
-	for _, msg := range m.messages {
-		if msg.Role == notificationRole {
-			continue
-		}
-		messages = append(messages, msg)
-	}
-	client := m.ollama
-	tools := m.tools
+func (m model) chat() tea.Cmd {
 	return func() tea.Msg {
-		var msg ollama.Message
-		stream := false
-		err := client.Chat(context.Background(), &ollama.ChatRequest{
-			Model:    "qwen3:1.7b",
-			Stream:   &stream,
-			Messages: messages,
-			Tools:    tools,
-		}, func(resp ollama.ChatResponse) error {
-			msg = resp.Message
-			return nil
-		})
-		if err != nil {
-			msg = ollama.Message{
-				Content: fmt.Sprintf("Error: %v", err),
-				Role:    notificationRole,
+		messages := make([]openai.ChatCompletionMessageParamUnion, 0, len(m.messages))
+		for _, msg := range m.messages {
+			if msg.Role == notificationRole {
+				continue
 			}
+			messages = append(messages, msg.To())
 		}
+		params := openai.ChatCompletionNewParams{
+			Model:    m.config.LLM.Model,
+			Messages: messages,
+			Tools:    m.tools,
+		}
+		msg, err := m.llm.Chat.Completions.New(context.Background(), params)
+		if err != nil {
+			// TODO: handle error properly
+			log.Error("Failed to get chat completion", "err", err)
+		}
+		// if err != nil {
+		// 	msg = ollama.Message{
+		// 		Content: fmt.Sprintf("Error: %v", err),
+		// 		Role:    notificationRole,
+		// 	}
+		// }
 		return msg
 	}
 }
 
-func (m *model) toolCalls(toolCalls []ollama.ToolCall) tea.Cmd {
+func (m model) toolCalls(toolCalls []openai.ChatCompletionMessageToolCall) tea.Cmd {
 	return func() tea.Msg {
 		toolResults := make([]mcp.CallToolResult, 0, len(toolCalls))
 		for _, toolCall := range toolCalls {
@@ -522,7 +508,12 @@ func (m *model) toolCalls(toolCalls []ollama.ToolCall) tea.Cmd {
 			defer cancel()
 			toolReq := mcp.CallToolRequest{}
 			toolReq.Params.Name = toolName
-			toolReq.Params.Arguments = toolCall.Function.Arguments
+			args := make(map[string]any)
+			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+				log.Error("Failed to unmarshal tool call arguments", "err", err, "args", toolCall.Function.Arguments)
+				continue
+			}
+			toolReq.Params.Arguments = args
 			toolRes, err := c.CallTool(ctx, toolReq)
 			if err != nil {
 				log.Error("Failed to call tool", "err", err)
@@ -548,6 +539,17 @@ func (m model) View() string {
 	return v
 }
 
+func chatMessageRole(msg openai.ChatCompletionMessageParamUnion) string {
+	if msg.OfUser != nil {
+		return userRole
+	} else if msg.OfAssistant != nil {
+		return assistantRole
+	} else if msg.OfTool != nil {
+		return toolRole
+	}
+	panic(fmt.Sprintf("Unknown message type: %#v", msg))
+}
+
 func (m model) messagesView() string {
 	messagesStrs := make([]string, 0, len(m.messages))
 	for _, msg := range m.messages {
@@ -557,36 +559,46 @@ func (m model) messagesView() string {
 			Width(80)
 		var boxPlacement lipgloss.Position
 		content := msg.Content
+		log.Debug("Processing message", "msg", fmt.Sprintf("%#v", msg))
 		switch msg.Role {
 		case userRole:
+			// log.Debug("User message", "content", content)
 			boxPlacement = lipgloss.Right
 			styBox = styBox.Align(boxPlacement).MarginRight(2)
 			content = m.maybeMarkdown(content)
 		case assistantRole:
+			// log.Debug("Assistant message", "content", content)
 			boxPlacement = lipgloss.Left
 			styBox = styBox.Align(boxPlacement).MarginLeft(2)
 			if content != "" {
 				content = m.maybeMarkdown(content)
 			}
 			if len(msg.ToolCalls) > 0 {
+				log.Debug("Assistant message with tool calls", "tools", msg.ToolCalls)
 				if content != "" {
 					content += "\n\n"
 				}
 				content += styGray.Render("Tool calls:") + "\n"
 				toolCallsStrs := make([]string, 0, len(msg.ToolCalls))
 				for _, toolCall := range msg.ToolCalls {
-					args := make([]string, 0, len(toolCall.Function.Arguments))
-					for k, v := range toolCall.Function.Arguments {
-						switch v := v.(type) {
-						case string:
-							args = append(args, fmt.Sprintf("%s:%q", k, v))
-						default:
-							args = append(args, fmt.Sprintf("%s:%s", k, v))
+					var args []string
+					argsMap := make(map[string]any)
+					if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &argsMap); err != nil {
+						args = []string{toolCall.Function.Arguments}
+					} else {
+						args = make([]string, 0, len(argsMap))
+						for k, v := range argsMap {
+							switch v := v.(type) {
+							case string:
+								args = append(args, fmt.Sprintf("%s:%q", k, v))
+							default:
+								args = append(args, fmt.Sprintf("%s:%s", k, v))
+							}
 						}
 					}
 					toolCallsStrs = append(toolCallsStrs, fmt.Sprintf(
-						"%d. %s(%s)",
-						toolCall.Function.Index,
+						"%s. %s(%s)",
+						toolCall.ID,
 						toolCall.Function.Name,
 						strings.Join(args, ", "),
 					))
