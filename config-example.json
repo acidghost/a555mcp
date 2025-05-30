@@ -1,0 +1,12 @@
+{
+  "llm": {
+    "url": "http://localhost:11434/v1",
+    "model": "qwen3:1.7b"
+  },
+  "servers": {
+    "time": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/time"]
+    }
+  }
+}
