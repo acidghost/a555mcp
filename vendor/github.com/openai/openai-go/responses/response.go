@@ -97,6 +97,23 @@ func (r *ResponseService) Get(ctx context.Context, responseID string, query Resp
 	return
 }
 
+// Retrieves a model response with the given ID.
+func (r *ResponseService) GetStreaming(ctx context.Context, responseID string, query ResponseGetParams, opts ...option.RequestOption) (stream *ssestream.Stream[ResponseStreamEventUnion]) {
+	var (
+		raw *http.Response
+		err error
+	)
+	opts = append(r.Options[:], opts...)
+	opts = append([]option.RequestOption{option.WithJSONSet("stream", true)}, opts...)
+	if responseID == "" {
+		err = errors.New("missing required response_id parameter")
+		return
+	}
+	path := fmt.Sprintf("responses/%s", responseID)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodGet, path, query, &raw, opts...)
+	return ssestream.NewStream[ResponseStreamEventUnion](ssestream.NewDecoder(raw), err)
+}
+
 // Deletes a model response with the given ID.
 func (r *ResponseService) Delete(ctx context.Context, responseID string, opts ...option.RequestOption) (err error) {
 	opts = append(r.Options[:], opts...)
@@ -113,15 +130,14 @@ func (r *ResponseService) Delete(ctx context.Context, responseID string, opts ..
 // Cancels a model response with the given ID. Only responses created with the
 // `background` parameter set to `true` can be cancelled.
 // [Learn more](https://platform.openai.com/docs/guides/background).
-func (r *ResponseService) Cancel(ctx context.Context, responseID string, opts ...option.RequestOption) (err error) {
+func (r *ResponseService) Cancel(ctx context.Context, responseID string, opts ...option.RequestOption) (res *Response, err error) {
 	opts = append(r.Options[:], opts...)
-	opts = append([]option.RequestOption{option.WithHeader("Accept", "")}, opts...)
 	if responseID == "" {
 		err = errors.New("missing required response_id parameter")
 		return
 	}
 	path := fmt.Sprintf("responses/%s/cancel", responseID)
-	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, nil, opts...)
+	err = requestconfig.ExecuteNewRequest(ctx, http.MethodPost, path, nil, &res, opts...)
 	return
 }
 
@@ -665,9 +681,9 @@ type Response struct {
 	//     utilize scale tier credits until they are exhausted.
 	//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
 	//     be processed using the default service tier with a lower uptime SLA and no
-	//     latency guarentee.
+	//     latency guarantee.
 	//   - If set to 'default', the request will be processed using the default service
-	//     tier with a lower uptime SLA and no latency guarentee.
+	//     tier with a lower uptime SLA and no latency guarantee.
 	//   - If set to 'flex', the request will be processed with the Flex Processing
 	//     service tier.
 	//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
@@ -827,9 +843,9 @@ func (r *ResponseToolChoiceUnion) UnmarshalJSON(data []byte) error {
 //     utilize scale tier credits until they are exhausted.
 //   - If set to 'auto', and the Project is not Scale tier enabled, the request will
 //     be processed using the default service tier with a lower uptime SLA and no
-//     latency guarentee.
+//     latency guarantee.
 //   - If set to 'default', the request will be processed using the default service
-//     tier with a lower uptime SLA and no latency guarentee.
+//     tier with a lower uptime SLA and no latency guarantee.
 //   - If set to 'flex', the request will be processed with the Flex Processing
 //     service tier.
 //     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
@@ -957,7 +973,7 @@ type ResponseCodeInterpreterCallCodeDeltaEvent struct {
 	OutputIndex int64 `json:"output_index,required"`
 	// The sequence number of this event.
 	SequenceNumber int64 `json:"sequence_number,required"`
-	// The type of the event. Always `response.code_interpreter_call.code.delta`.
+	// The type of the event. Always `response.code_interpreter_call_code.delta`.
 	Type constant.ResponseCodeInterpreterCallCodeDelta `json:"type,required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
@@ -984,7 +1000,7 @@ type ResponseCodeInterpreterCallCodeDoneEvent struct {
 	OutputIndex int64 `json:"output_index,required"`
 	// The sequence number of this event.
 	SequenceNumber int64 `json:"sequence_number,required"`
-	// The type of the event. Always `response.code_interpreter_call.code.done`.
+	// The type of the event. Always `response.code_interpreter_call_code.done`.
 	Type constant.ResponseCodeInterpreterCallCodeDone `json:"type,required"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
@@ -2593,12 +2609,15 @@ type ResponseContentPartAddedEventPartUnion struct {
 	Text string `json:"text"`
 	// Any of "output_text", "refusal".
 	Type string `json:"type"`
+	// This field is from variant [ResponseOutputText].
+	Logprobs []ResponseOutputTextLogprob `json:"logprobs"`
 	// This field is from variant [ResponseOutputRefusal].
 	Refusal string `json:"refusal"`
 	JSON    struct {
 		Annotations respjson.Field
 		Text        respjson.Field
 		Type        respjson.Field
+		Logprobs    respjson.Field
 		Refusal     respjson.Field
 		raw         string
 	} `json:"-"`
@@ -2696,12 +2715,15 @@ type ResponseContentPartDoneEventPartUnion struct {
 	Text string `json:"text"`
 	// Any of "output_text", "refusal".
 	Type string `json:"type"`
+	// This field is from variant [ResponseOutputText].
+	Logprobs []ResponseOutputTextLogprob `json:"logprobs"`
 	// This field is from variant [ResponseOutputRefusal].
 	Refusal string `json:"refusal"`
 	JSON    struct {
 		Annotations respjson.Field
 		Text        respjson.Field
 		Type        respjson.Field
+		Logprobs    respjson.Field
 		Refusal     respjson.Field
 		raw         string
 	} `json:"-"`
@@ -3889,6 +3911,8 @@ func (r *ResponseInProgressEvent) UnmarshalJSON(data []byte) error {
 //     multi-turn conversations when using the Responses API statelessly (like when
 //     the `store` parameter is set to `false`, or when an organization is enrolled
 //     in the zero data retention program).
+//   - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+//     in code interpreter tool call items.
 type ResponseIncludable string
 
 const (
@@ -3896,6 +3920,7 @@ const (
 	ResponseIncludableMessageInputImageImageURL        ResponseIncludable = "message.input_image.image_url"
 	ResponseIncludableComputerCallOutputOutputImageURL ResponseIncludable = "computer_call_output.output.image_url"
 	ResponseIncludableReasoningEncryptedContent        ResponseIncludable = "reasoning.encrypted_content"
+	ResponseIncludableCodeInterpreterCallOutputs       ResponseIncludable = "code_interpreter_call.outputs"
 )
 
 // An event that is emitted when a response finishes as incomplete.
@@ -7087,12 +7112,15 @@ type ResponseOutputMessageContentUnion struct {
 	Text string `json:"text"`
 	// Any of "output_text", "refusal".
 	Type string `json:"type"`
+	// This field is from variant [ResponseOutputText].
+	Logprobs []ResponseOutputTextLogprob `json:"logprobs"`
 	// This field is from variant [ResponseOutputRefusal].
 	Refusal string `json:"refusal"`
 	JSON    struct {
 		Annotations respjson.Field
 		Text        respjson.Field
 		Type        respjson.Field
+		Logprobs    respjson.Field
 		Refusal     respjson.Field
 		raw         string
 	} `json:"-"`
@@ -7227,6 +7255,14 @@ func (u ResponseOutputMessageContentUnionParam) GetText() *string {
 }
 
 // Returns a pointer to the underlying variant's property, if present.
+func (u ResponseOutputMessageContentUnionParam) GetLogprobs() []ResponseOutputTextLogprobParam {
+	if vt := u.OfOutputText; vt != nil {
+		return vt.Logprobs
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
 func (u ResponseOutputMessageContentUnionParam) GetRefusal() *string {
 	if vt := u.OfRefusal; vt != nil {
 		return &vt.Refusal
@@ -7310,12 +7346,14 @@ type ResponseOutputText struct {
 	// The text output from the model.
 	Text string `json:"text,required"`
 	// The type of the output text. Always `output_text`.
-	Type constant.OutputText `json:"type,required"`
+	Type     constant.OutputText         `json:"type,required"`
+	Logprobs []ResponseOutputTextLogprob `json:"logprobs"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
 		Annotations respjson.Field
 		Text        respjson.Field
 		Type        respjson.Field
+		Logprobs    respjson.Field
 		ExtraFields map[string]respjson.Field
 		raw         string
 	} `json:"-"`
@@ -7339,6 +7377,7 @@ func (r ResponseOutputText) ToParam() ResponseOutputTextParam {
 // ResponseOutputTextAnnotationUnion contains all possible properties and values
 // from [ResponseOutputTextAnnotationFileCitation],
 // [ResponseOutputTextAnnotationURLCitation],
+// [ResponseOutputTextAnnotationContainerFileCitation],
 // [ResponseOutputTextAnnotationFilePath].
 //
 // Use the [ResponseOutputTextAnnotationUnion.AsAny] method to switch on the
@@ -7348,25 +7387,26 @@ func (r ResponseOutputText) ToParam() ResponseOutputTextParam {
 type ResponseOutputTextAnnotationUnion struct {
 	FileID string `json:"file_id"`
 	Index  int64  `json:"index"`
-	// Any of "file_citation", "url_citation", "file_path".
-	Type string `json:"type"`
-	// This field is from variant [ResponseOutputTextAnnotationURLCitation].
-	EndIndex int64 `json:"end_index"`
-	// This field is from variant [ResponseOutputTextAnnotationURLCitation].
-	StartIndex int64 `json:"start_index"`
+	// Any of "file_citation", "url_citation", "container_file_citation", "file_path".
+	Type       string `json:"type"`
+	EndIndex   int64  `json:"end_index"`
+	StartIndex int64  `json:"start_index"`
 	// This field is from variant [ResponseOutputTextAnnotationURLCitation].
 	Title string `json:"title"`
 	// This field is from variant [ResponseOutputTextAnnotationURLCitation].
-	URL  string `json:"url"`
-	JSON struct {
-		FileID     respjson.Field
-		Index      respjson.Field
-		Type       respjson.Field
-		EndIndex   respjson.Field
-		StartIndex respjson.Field
-		Title      respjson.Field
-		URL        respjson.Field
-		raw        string
+	URL string `json:"url"`
+	// This field is from variant [ResponseOutputTextAnnotationContainerFileCitation].
+	ContainerID string `json:"container_id"`
+	JSON        struct {
+		FileID      respjson.Field
+		Index       respjson.Field
+		Type        respjson.Field
+		EndIndex    respjson.Field
+		StartIndex  respjson.Field
+		Title       respjson.Field
+		URL         respjson.Field
+		ContainerID respjson.Field
+		raw         string
 	} `json:"-"`
 }
 
@@ -7377,15 +7417,17 @@ type anyResponseOutputTextAnnotation interface {
 	implResponseOutputTextAnnotationUnion()
 }
 
-func (ResponseOutputTextAnnotationFileCitation) implResponseOutputTextAnnotationUnion() {}
-func (ResponseOutputTextAnnotationURLCitation) implResponseOutputTextAnnotationUnion()  {}
-func (ResponseOutputTextAnnotationFilePath) implResponseOutputTextAnnotationUnion()     {}
+func (ResponseOutputTextAnnotationFileCitation) implResponseOutputTextAnnotationUnion()          {}
+func (ResponseOutputTextAnnotationURLCitation) implResponseOutputTextAnnotationUnion()           {}
+func (ResponseOutputTextAnnotationContainerFileCitation) implResponseOutputTextAnnotationUnion() {}
+func (ResponseOutputTextAnnotationFilePath) implResponseOutputTextAnnotationUnion()              {}
 
 // Use the following switch statement to find the correct variant
 //
 //	switch variant := ResponseOutputTextAnnotationUnion.AsAny().(type) {
 //	case responses.ResponseOutputTextAnnotationFileCitation:
 //	case responses.ResponseOutputTextAnnotationURLCitation:
+//	case responses.ResponseOutputTextAnnotationContainerFileCitation:
 //	case responses.ResponseOutputTextAnnotationFilePath:
 //	default:
 //	  fmt.Errorf("no variant present")
@@ -7396,6 +7438,8 @@ func (u ResponseOutputTextAnnotationUnion) AsAny() anyResponseOutputTextAnnotati
 		return u.AsFileCitation()
 	case "url_citation":
 		return u.AsURLCitation()
+	case "container_file_citation":
+		return u.AsContainerFileCitation()
 	case "file_path":
 		return u.AsFilePath()
 	}
@@ -7408,6 +7452,11 @@ func (u ResponseOutputTextAnnotationUnion) AsFileCitation() (v ResponseOutputTex
 }
 
 func (u ResponseOutputTextAnnotationUnion) AsURLCitation() (v ResponseOutputTextAnnotationURLCitation) {
+	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
+	return
+}
+
+func (u ResponseOutputTextAnnotationUnion) AsContainerFileCitation() (v ResponseOutputTextAnnotationContainerFileCitation) {
 	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
@@ -7478,6 +7527,36 @@ func (r *ResponseOutputTextAnnotationURLCitation) UnmarshalJSON(data []byte) err
 	return apijson.UnmarshalRoot(data, r)
 }
 
+// A citation for a container file used to generate a model response.
+type ResponseOutputTextAnnotationContainerFileCitation struct {
+	// The ID of the container file.
+	ContainerID string `json:"container_id,required"`
+	// The index of the last character of the container file citation in the message.
+	EndIndex int64 `json:"end_index,required"`
+	// The ID of the file.
+	FileID string `json:"file_id,required"`
+	// The index of the first character of the container file citation in the message.
+	StartIndex int64 `json:"start_index,required"`
+	// The type of the container file citation. Always `container_file_citation`.
+	Type constant.ContainerFileCitation `json:"type,required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		ContainerID respjson.Field
+		EndIndex    respjson.Field
+		FileID      respjson.Field
+		StartIndex  respjson.Field
+		Type        respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r ResponseOutputTextAnnotationContainerFileCitation) RawJSON() string { return r.JSON.raw }
+func (r *ResponseOutputTextAnnotationContainerFileCitation) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
 // A path to a file.
 type ResponseOutputTextAnnotationFilePath struct {
 	// The ID of the file.
@@ -7502,6 +7581,50 @@ func (r *ResponseOutputTextAnnotationFilePath) UnmarshalJSON(data []byte) error 
 	return apijson.UnmarshalRoot(data, r)
 }
 
+// The log probability of a token.
+type ResponseOutputTextLogprob struct {
+	Token       string                                `json:"token,required"`
+	Bytes       []int64                               `json:"bytes,required"`
+	Logprob     float64                               `json:"logprob,required"`
+	TopLogprobs []ResponseOutputTextLogprobTopLogprob `json:"top_logprobs,required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Token       respjson.Field
+		Bytes       respjson.Field
+		Logprob     respjson.Field
+		TopLogprobs respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r ResponseOutputTextLogprob) RawJSON() string { return r.JSON.raw }
+func (r *ResponseOutputTextLogprob) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The top log probability of a token.
+type ResponseOutputTextLogprobTopLogprob struct {
+	Token   string  `json:"token,required"`
+	Bytes   []int64 `json:"bytes,required"`
+	Logprob float64 `json:"logprob,required"`
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
+	JSON struct {
+		Token       respjson.Field
+		Bytes       respjson.Field
+		Logprob     respjson.Field
+		ExtraFields map[string]respjson.Field
+		raw         string
+	} `json:"-"`
+}
+
+// Returns the unmodified JSON received from the API
+func (r ResponseOutputTextLogprobTopLogprob) RawJSON() string { return r.JSON.raw }
+func (r *ResponseOutputTextLogprobTopLogprob) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
 // A text output from the model.
 //
 // The properties Annotations, Text, Type are required.
@@ -7509,7 +7632,8 @@ type ResponseOutputTextParam struct {
 	// The annotations of the text output.
 	Annotations []ResponseOutputTextAnnotationUnionParam `json:"annotations,omitzero,required"`
 	// The text output from the model.
-	Text string `json:"text,required"`
+	Text     string                           `json:"text,required"`
+	Logprobs []ResponseOutputTextLogprobParam `json:"logprobs,omitzero"`
 	// The type of the output text. Always `output_text`.
 	//
 	// This field can be elided, and will marshal its zero value as "output_text".
@@ -7529,14 +7653,15 @@ func (r *ResponseOutputTextParam) UnmarshalJSON(data []byte) error {
 //
 // Use [param.IsOmitted] to confirm if a field is set.
 type ResponseOutputTextAnnotationUnionParam struct {
-	OfFileCitation *ResponseOutputTextAnnotationFileCitationParam `json:",omitzero,inline"`
-	OfURLCitation  *ResponseOutputTextAnnotationURLCitationParam  `json:",omitzero,inline"`
-	OfFilePath     *ResponseOutputTextAnnotationFilePathParam     `json:",omitzero,inline"`
+	OfFileCitation          *ResponseOutputTextAnnotationFileCitationParam          `json:",omitzero,inline"`
+	OfURLCitation           *ResponseOutputTextAnnotationURLCitationParam           `json:",omitzero,inline"`
+	OfContainerFileCitation *ResponseOutputTextAnnotationContainerFileCitationParam `json:",omitzero,inline"`
+	OfFilePath              *ResponseOutputTextAnnotationFilePathParam              `json:",omitzero,inline"`
 	paramUnion
 }
 
 func (u ResponseOutputTextAnnotationUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ResponseOutputTextAnnotationUnionParam](u.OfFileCitation, u.OfURLCitation, u.OfFilePath)
+	return param.MarshalUnion[ResponseOutputTextAnnotationUnionParam](u.OfFileCitation, u.OfURLCitation, u.OfContainerFileCitation, u.OfFilePath)
 }
 func (u *ResponseOutputTextAnnotationUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -7547,24 +7672,10 @@ func (u *ResponseOutputTextAnnotationUnionParam) asAny() any {
 		return u.OfFileCitation
 	} else if !param.IsOmitted(u.OfURLCitation) {
 		return u.OfURLCitation
+	} else if !param.IsOmitted(u.OfContainerFileCitation) {
+		return u.OfContainerFileCitation
 	} else if !param.IsOmitted(u.OfFilePath) {
 		return u.OfFilePath
-	}
-	return nil
-}
-
-// Returns a pointer to the underlying variant's property, if present.
-func (u ResponseOutputTextAnnotationUnionParam) GetEndIndex() *int64 {
-	if vt := u.OfURLCitation; vt != nil {
-		return &vt.EndIndex
-	}
-	return nil
-}
-
-// Returns a pointer to the underlying variant's property, if present.
-func (u ResponseOutputTextAnnotationUnionParam) GetStartIndex() *int64 {
-	if vt := u.OfURLCitation; vt != nil {
-		return &vt.StartIndex
 	}
 	return nil
 }
@@ -7586,8 +7697,18 @@ func (u ResponseOutputTextAnnotationUnionParam) GetURL() *string {
 }
 
 // Returns a pointer to the underlying variant's property, if present.
+func (u ResponseOutputTextAnnotationUnionParam) GetContainerID() *string {
+	if vt := u.OfContainerFileCitation; vt != nil {
+		return &vt.ContainerID
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
 func (u ResponseOutputTextAnnotationUnionParam) GetFileID() *string {
 	if vt := u.OfFileCitation; vt != nil {
+		return (*string)(&vt.FileID)
+	} else if vt := u.OfContainerFileCitation; vt != nil {
 		return (*string)(&vt.FileID)
 	} else if vt := u.OfFilePath; vt != nil {
 		return (*string)(&vt.FileID)
@@ -7611,8 +7732,30 @@ func (u ResponseOutputTextAnnotationUnionParam) GetType() *string {
 		return (*string)(&vt.Type)
 	} else if vt := u.OfURLCitation; vt != nil {
 		return (*string)(&vt.Type)
+	} else if vt := u.OfContainerFileCitation; vt != nil {
+		return (*string)(&vt.Type)
 	} else if vt := u.OfFilePath; vt != nil {
 		return (*string)(&vt.Type)
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u ResponseOutputTextAnnotationUnionParam) GetEndIndex() *int64 {
+	if vt := u.OfURLCitation; vt != nil {
+		return (*int64)(&vt.EndIndex)
+	} else if vt := u.OfContainerFileCitation; vt != nil {
+		return (*int64)(&vt.EndIndex)
+	}
+	return nil
+}
+
+// Returns a pointer to the underlying variant's property, if present.
+func (u ResponseOutputTextAnnotationUnionParam) GetStartIndex() *int64 {
+	if vt := u.OfURLCitation; vt != nil {
+		return (*int64)(&vt.StartIndex)
+	} else if vt := u.OfContainerFileCitation; vt != nil {
+		return (*int64)(&vt.StartIndex)
 	}
 	return nil
 }
@@ -7622,6 +7765,7 @@ func init() {
 		"type",
 		apijson.Discriminator[ResponseOutputTextAnnotationFileCitationParam]("file_citation"),
 		apijson.Discriminator[ResponseOutputTextAnnotationURLCitationParam]("url_citation"),
+		apijson.Discriminator[ResponseOutputTextAnnotationContainerFileCitationParam]("container_file_citation"),
 		apijson.Discriminator[ResponseOutputTextAnnotationFilePathParam]("file_path"),
 	)
 }
@@ -7676,6 +7820,34 @@ func (r *ResponseOutputTextAnnotationURLCitationParam) UnmarshalJSON(data []byte
 	return apijson.UnmarshalRoot(data, r)
 }
 
+// A citation for a container file used to generate a model response.
+//
+// The properties ContainerID, EndIndex, FileID, StartIndex, Type are required.
+type ResponseOutputTextAnnotationContainerFileCitationParam struct {
+	// The ID of the container file.
+	ContainerID string `json:"container_id,required"`
+	// The index of the last character of the container file citation in the message.
+	EndIndex int64 `json:"end_index,required"`
+	// The ID of the file.
+	FileID string `json:"file_id,required"`
+	// The index of the first character of the container file citation in the message.
+	StartIndex int64 `json:"start_index,required"`
+	// The type of the container file citation. Always `container_file_citation`.
+	//
+	// This field can be elided, and will marshal its zero value as
+	// "container_file_citation".
+	Type constant.ContainerFileCitation `json:"type,required"`
+	paramObj
+}
+
+func (r ResponseOutputTextAnnotationContainerFileCitationParam) MarshalJSON() (data []byte, err error) {
+	type shadow ResponseOutputTextAnnotationContainerFileCitationParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *ResponseOutputTextAnnotationContainerFileCitationParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
 // A path to a file.
 //
 // The properties FileID, Index, Type are required.
@@ -7696,6 +7868,43 @@ func (r ResponseOutputTextAnnotationFilePathParam) MarshalJSON() (data []byte, e
 	return param.MarshalObject(r, (*shadow)(&r))
 }
 func (r *ResponseOutputTextAnnotationFilePathParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The log probability of a token.
+//
+// The properties Token, Bytes, Logprob, TopLogprobs are required.
+type ResponseOutputTextLogprobParam struct {
+	Token       string                                     `json:"token,required"`
+	Bytes       []int64                                    `json:"bytes,omitzero,required"`
+	Logprob     float64                                    `json:"logprob,required"`
+	TopLogprobs []ResponseOutputTextLogprobTopLogprobParam `json:"top_logprobs,omitzero,required"`
+	paramObj
+}
+
+func (r ResponseOutputTextLogprobParam) MarshalJSON() (data []byte, err error) {
+	type shadow ResponseOutputTextLogprobParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *ResponseOutputTextLogprobParam) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
+}
+
+// The top log probability of a token.
+//
+// The properties Token, Bytes, Logprob are required.
+type ResponseOutputTextLogprobTopLogprobParam struct {
+	Token   string  `json:"token,required"`
+	Bytes   []int64 `json:"bytes,omitzero,required"`
+	Logprob float64 `json:"logprob,required"`
+	paramObj
+}
+
+func (r ResponseOutputTextLogprobTopLogprobParam) MarshalJSON() (data []byte, err error) {
+	type shadow ResponseOutputTextLogprobTopLogprobParam
+	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *ResponseOutputTextLogprobTopLogprobParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
@@ -8317,8 +8526,8 @@ type ResponseStreamEventUnion struct {
 	SequenceNumber int64                         `json:"sequence_number"`
 	// Any of "response.audio.delta", "response.audio.done",
 	// "response.audio.transcript.delta", "response.audio.transcript.done",
-	// "response.code_interpreter_call.code.delta",
-	// "response.code_interpreter_call.code.done",
+	// "response.code_interpreter_call_code.delta",
+	// "response.code_interpreter_call_code.done",
 	// "response.code_interpreter_call.completed",
 	// "response.code_interpreter_call.in_progress",
 	// "response.code_interpreter_call.interpreting", "response.completed",
@@ -8535,9 +8744,9 @@ func (u ResponseStreamEventUnion) AsAny() anyResponseStreamEvent {
 		return u.AsResponseAudioTranscriptDelta()
 	case "response.audio.transcript.done":
 		return u.AsResponseAudioTranscriptDone()
-	case "response.code_interpreter_call.code.delta":
+	case "response.code_interpreter_call_code.delta":
 		return u.AsResponseCodeInterpreterCallCodeDelta()
-	case "response.code_interpreter_call.code.done":
+	case "response.code_interpreter_call_code.done":
 		return u.AsResponseCodeInterpreterCallCodeDone()
 	case "response.code_interpreter_call.completed":
 		return u.AsResponseCodeInterpreterCallCompleted()
@@ -8948,11 +9157,15 @@ type ResponseStreamEventUnionPart struct {
 	Type        string                              `json:"type"`
 	// This field is from variant [ResponseContentPartAddedEventPartUnion],
 	// [ResponseContentPartDoneEventPartUnion].
+	Logprobs []ResponseOutputTextLogprob `json:"logprobs"`
+	// This field is from variant [ResponseContentPartAddedEventPartUnion],
+	// [ResponseContentPartDoneEventPartUnion].
 	Refusal string `json:"refusal"`
 	JSON    struct {
 		Annotations respjson.Field
 		Text        respjson.Field
 		Type        respjson.Field
+		Logprobs    respjson.Field
 		Refusal     respjson.Field
 		raw         string
 	} `json:"-"`
@@ -10885,6 +11098,8 @@ type ResponseNewParams struct {
 	//     multi-turn conversations when using the Responses API statelessly (like when
 	//     the `store` parameter is set to `false`, or when an organization is enrolled
 	//     in the zero data retention program).
+	//   - `code_interpreter_call.outputs`: Includes the outputs of python code execution
+	//     in code interpreter tool call items.
 	Include []ResponseIncludable `json:"include,omitzero"`
 	// Set of 16 key-value pairs that can be attached to an object. This can be useful
 	// for storing additional information about the object in a structured format, and
@@ -10900,9 +11115,9 @@ type ResponseNewParams struct {
 	//     utilize scale tier credits until they are exhausted.
 	//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
 	//     be processed using the default service tier with a lower uptime SLA and no
-	//     latency guarentee.
+	//     latency guarantee.
 	//   - If set to 'default', the request will be processed using the default service
-	//     tier with a lower uptime SLA and no latency guarentee.
+	//     tier with a lower uptime SLA and no latency guarantee.
 	//   - If set to 'flex', the request will be processed with the Flex Processing
 	//     service tier.
 	//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
@@ -10996,9 +11211,9 @@ func (u *ResponseNewParamsInputUnion) asAny() any {
 //     utilize scale tier credits until they are exhausted.
 //   - If set to 'auto', and the Project is not Scale tier enabled, the request will
 //     be processed using the default service tier with a lower uptime SLA and no
-//     latency guarentee.
+//     latency guarantee.
 //   - If set to 'default', the request will be processed using the default service
-//     tier with a lower uptime SLA and no latency guarentee.
+//     tier with a lower uptime SLA and no latency guarantee.
 //   - If set to 'flex', the request will be processed with the Flex Processing
 //     service tier.
 //     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
@@ -11076,6 +11291,8 @@ const (
 )
 
 type ResponseGetParams struct {
+	// The sequence number of the event after which to start streaming.
+	StartingAfter param.Opt[int64] `query:"starting_after,omitzero" json:"-"`
 	// Additional fields to include in the response. See the `include` parameter for
 	// Response creation above for more information.
 	Include []ResponseIncludable `query:"include,omitzero" json:"-"`
