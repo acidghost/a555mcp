@@ -246,7 +246,7 @@ type TranscriptionTextDeltaEventLogprob struct {
 	// The token that was used to generate the log probability.
 	Token string `json:"token"`
 	// The bytes that were used to generate the log probability.
-	Bytes []any `json:"bytes"`
+	Bytes []int64 `json:"bytes"`
 	// The log probability of the token.
 	Logprob float64 `json:"logprob"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
@@ -299,7 +299,7 @@ type TranscriptionTextDoneEventLogprob struct {
 	// The token that was used to generate the log probability.
 	Token string `json:"token"`
 	// The bytes that were used to generate the log probability.
-	Bytes []any `json:"bytes"`
+	Bytes []int64 `json:"bytes"`
 	// The log probability of the token.
 	Logprob float64 `json:"logprob"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
@@ -398,7 +398,7 @@ type AudioTranscriptionNewParamsChunkingStrategyUnion struct {
 }
 
 func (u AudioTranscriptionNewParamsChunkingStrategyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[AudioTranscriptionNewParamsChunkingStrategyUnion](u.OfAuto, u.OfAudioTranscriptionNewsChunkingStrategyVadConfig)
+	return param.MarshalUnion(u, u.OfAuto, u.OfAudioTranscriptionNewsChunkingStrategyVadConfig)
 }
 func (u *AudioTranscriptionNewParamsChunkingStrategyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)

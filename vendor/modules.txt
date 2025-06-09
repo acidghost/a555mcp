@@ -118,7 +118,7 @@ github.com/muesli/reflow/wordwrap
 # github.com/muesli/termenv v0.16.0
 ## explicit; go 1.17
 github.com/muesli/termenv
-# github.com/openai/openai-go v1.1.0
+# github.com/openai/openai-go v1.4.0
 ## explicit; go 1.21
 github.com/openai/openai-go
 github.com/openai/openai-go/internal
