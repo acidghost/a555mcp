@@ -33,11 +33,13 @@ type CodeInterpreterCall string                     // Always "code_interpreter_
 type ComputerCallOutput string                      // Always "computer_call_output"
 type ComputerScreenshot string                      // Always "computer_screenshot"
 type ComputerUsePreview string                      // Always "computer_use_preview"
+type ContainerFileCitation string                   // Always "container_file_citation"
 type ContainerFile string                           // Always "container.file"
 type Content string                                 // Always "content"
 type Developer string                               // Always "developer"
 type DoubleClick string                             // Always "double_click"
 type Drag string                                    // Always "drag"
+type Duration string                                // Always "duration"
 type Embedding string                               // Always "embedding"
 type Error string                                   // Always "error"
 type Exec string                                    // Always "exec"
@@ -46,7 +48,6 @@ type FileCitation string                            // Always "file_citation"
 type FilePath string                                // Always "file_path"
 type FileSearch string                              // Always "file_search"
 type FileSearchCall string                          // Always "file_search_call"
-type Files string                                   // Always "files"
 type FineTuningJob string                           // Always "fine_tuning.job"
 type FineTuningJobCheckpoint string                 // Always "fine_tuning.job.checkpoint"
 type FineTuningJobEvent string                      // Always "fine_tuning.job.event"
@@ -93,8 +94,8 @@ type ResponseAudioDelta string                      // Always "response.audio.de
 type ResponseAudioDone string                       // Always "response.audio.done"
 type ResponseAudioTranscriptDelta string            // Always "response.audio.transcript.delta"
 type ResponseAudioTranscriptDone string             // Always "response.audio.transcript.done"
-type ResponseCodeInterpreterCallCodeDelta string    // Always "response.code_interpreter_call.code.delta"
-type ResponseCodeInterpreterCallCodeDone string     // Always "response.code_interpreter_call.code.done"
+type ResponseCodeInterpreterCallCodeDelta string    // Always "response.code_interpreter_call_code.delta"
+type ResponseCodeInterpreterCallCodeDone string     // Always "response.code_interpreter_call_code.done"
 type ResponseCodeInterpreterCallCompleted string    // Always "response.code_interpreter_call.completed"
 type ResponseCodeInterpreterCallInProgress string   // Always "response.code_interpreter_call.in_progress"
 type ResponseCodeInterpreterCallInterpreting string // Always "response.code_interpreter_call.interpreting"
@@ -181,6 +182,7 @@ type ThreadRunStepDelta string                      // Always "thread.run.step.d
 type ThreadRunStepExpired string                    // Always "thread.run.step.expired"
 type ThreadRunStepFailed string                     // Always "thread.run.step.failed"
 type ThreadRunStepInProgress string                 // Always "thread.run.step.in_progress"
+type Tokens string                                  // Always "tokens"
 type Tool string                                    // Always "tool"
 type ToolCalls string                               // Always "tool_calls"
 type TranscriptTextDelta string                     // Always "transcript.text.delta"
@@ -216,11 +218,13 @@ func (c CodeInterpreterCall) Default() CodeInterpreterCall     { return "code_in
 func (c ComputerCallOutput) Default() ComputerCallOutput       { return "computer_call_output" }
 func (c ComputerScreenshot) Default() ComputerScreenshot       { return "computer_screenshot" }
 func (c ComputerUsePreview) Default() ComputerUsePreview       { return "computer_use_preview" }
+func (c ContainerFileCitation) Default() ContainerFileCitation { return "container_file_citation" }
 func (c ContainerFile) Default() ContainerFile                 { return "container.file" }
 func (c Content) Default() Content                             { return "content" }
 func (c Developer) Default() Developer                         { return "developer" }
 func (c DoubleClick) Default() DoubleClick                     { return "double_click" }
 func (c Drag) Default() Drag                                   { return "drag" }
+func (c Duration) Default() Duration                           { return "duration" }
 func (c Embedding) Default() Embedding                         { return "embedding" }
 func (c Error) Default() Error                                 { return "error" }
 func (c Exec) Default() Exec                                   { return "exec" }
@@ -229,7 +233,6 @@ func (c FileCitation) Default() FileCitation                   { return "file_ci
 func (c FilePath) Default() FilePath                           { return "file_path" }
 func (c FileSearch) Default() FileSearch                       { return "file_search" }
 func (c FileSearchCall) Default() FileSearchCall               { return "file_search_call" }
-func (c Files) Default() Files                                 { return "files" }
 func (c FineTuningJob) Default() FineTuningJob                 { return "fine_tuning.job" }
 func (c FineTuningJobCheckpoint) Default() FineTuningJobCheckpoint {
 	return "fine_tuning.job.checkpoint"
@@ -283,10 +286,10 @@ func (c ResponseAudioTranscriptDone) Default() ResponseAudioTranscriptDone {
 	return "response.audio.transcript.done"
 }
 func (c ResponseCodeInterpreterCallCodeDelta) Default() ResponseCodeInterpreterCallCodeDelta {
-	return "response.code_interpreter_call.code.delta"
+	return "response.code_interpreter_call_code.delta"
 }
 func (c ResponseCodeInterpreterCallCodeDone) Default() ResponseCodeInterpreterCallCodeDone {
-	return "response.code_interpreter_call.code.done"
+	return "response.code_interpreter_call_code.done"
 }
 func (c ResponseCodeInterpreterCallCompleted) Default() ResponseCodeInterpreterCallCompleted {
 	return "response.code_interpreter_call.completed"
@@ -448,6 +451,7 @@ func (c ThreadRunStepFailed) Default() ThreadRunStepFailed       { return "threa
 func (c ThreadRunStepInProgress) Default() ThreadRunStepInProgress {
 	return "thread.run.step.in_progress"
 }
+func (c Tokens) Default() Tokens                           { return "tokens" }
 func (c Tool) Default() Tool                               { return "tool" }
 func (c ToolCalls) Default() ToolCalls                     { return "tool_calls" }
 func (c TranscriptTextDelta) Default() TranscriptTextDelta { return "transcript.text.delta" }
@@ -487,11 +491,13 @@ func (c CodeInterpreterCall) MarshalJSON() ([]byte, error)                   { r
 func (c ComputerCallOutput) MarshalJSON() ([]byte, error)                    { return marshalString(c) }
 func (c ComputerScreenshot) MarshalJSON() ([]byte, error)                    { return marshalString(c) }
 func (c ComputerUsePreview) MarshalJSON() ([]byte, error)                    { return marshalString(c) }
+func (c ContainerFileCitation) MarshalJSON() ([]byte, error)                 { return marshalString(c) }
 func (c ContainerFile) MarshalJSON() ([]byte, error)                         { return marshalString(c) }
 func (c Content) MarshalJSON() ([]byte, error)                               { return marshalString(c) }
 func (c Developer) MarshalJSON() ([]byte, error)                             { return marshalString(c) }
 func (c DoubleClick) MarshalJSON() ([]byte, error)                           { return marshalString(c) }
 func (c Drag) MarshalJSON() ([]byte, error)                                  { return marshalString(c) }
+func (c Duration) MarshalJSON() ([]byte, error)                              { return marshalString(c) }
 func (c Embedding) MarshalJSON() ([]byte, error)                             { return marshalString(c) }
 func (c Error) MarshalJSON() ([]byte, error)                                 { return marshalString(c) }
 func (c Exec) MarshalJSON() ([]byte, error)                                  { return marshalString(c) }
@@ -500,7 +506,6 @@ func (c FileCitation) MarshalJSON() ([]byte, error)                          { r
 func (c FilePath) MarshalJSON() ([]byte, error)                              { return marshalString(c) }
 func (c FileSearch) MarshalJSON() ([]byte, error)                            { return marshalString(c) }
 func (c FileSearchCall) MarshalJSON() ([]byte, error)                        { return marshalString(c) }
-func (c Files) MarshalJSON() ([]byte, error)                                 { return marshalString(c) }
 func (c FineTuningJob) MarshalJSON() ([]byte, error)                         { return marshalString(c) }
 func (c FineTuningJobCheckpoint) MarshalJSON() ([]byte, error)               { return marshalString(c) }
 func (c FineTuningJobEvent) MarshalJSON() ([]byte, error)                    { return marshalString(c) }
@@ -639,6 +644,7 @@ func (c ThreadRunStepDelta) MarshalJSON() ([]byte, error)                { retur
 func (c ThreadRunStepExpired) MarshalJSON() ([]byte, error)              { return marshalString(c) }
 func (c ThreadRunStepFailed) MarshalJSON() ([]byte, error)               { return marshalString(c) }
 func (c ThreadRunStepInProgress) MarshalJSON() ([]byte, error)           { return marshalString(c) }
+func (c Tokens) MarshalJSON() ([]byte, error)                            { return marshalString(c) }
 func (c Tool) MarshalJSON() ([]byte, error)                              { return marshalString(c) }
 func (c ToolCalls) MarshalJSON() ([]byte, error)                         { return marshalString(c) }
 func (c TranscriptTextDelta) MarshalJSON() ([]byte, error)               { return marshalString(c) }
