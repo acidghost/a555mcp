@@ -1,5 +1,110 @@
 # Changelog
 
+## 1.8.0 (2025-06-26)
+
+Full Changelog: [v1.7.0...v1.8.0](https://github.com/openai/openai-go/compare/v1.7.0...v1.8.0)
+
+### Features
+
+* **api:** webhook and deep research support ([f6a7e7d](https://github.com/openai/openai-go/commit/f6a7e7dcd8801facc4f8d981f1ca43786c10de1e))
+
+
+### Chores
+
+* **internal:** add tests for breaking change detection ([339522d](https://github.com/openai/openai-go/commit/339522d38cd31b0753a8df37b8924f7e7dfb0b1d))
+
+## 1.7.0 (2025-06-23)
+
+Full Changelog: [v1.6.0...v1.7.0](https://github.com/openai/openai-go/compare/v1.6.0...v1.7.0)
+
+### Features
+
+* **api:** make model and inputs not required to create response ([19f0b76](https://github.com/openai/openai-go/commit/19f0b76378d35b3d81c60c85bf2e64d6bf85b9c2))
+* **api:** update api shapes for usage and code interpreter ([d24d42c](https://github.com/openai/openai-go/commit/d24d42cba60e565627e8ffb1cac63a5085ddb6da))
+* **client:** add escape hatch for null slice & maps ([9c633d6](https://github.com/openai/openai-go/commit/9c633d6f1dbcc0b153f42f831ee7e13d6fe62296))
+
+
+### Chores
+
+* fix documentation of null map ([8f3a134](https://github.com/openai/openai-go/commit/8f3a134e500b1b7791ab855adaef2d7b10d2d1c3))
+
+## 1.6.0 (2025-06-17)
+
+Full Changelog: [v1.5.0...v1.6.0](https://github.com/openai/openai-go/compare/v1.5.0...v1.6.0)
+
+### Features
+
+* **api:** add reusable prompt IDs ([280c698](https://github.com/openai/openai-go/commit/280c698015eba5f6bd47e2fce038eb401f6ef0f2))
+* **api:** manual updates ([740f840](https://github.com/openai/openai-go/commit/740f84006ac283a25f5ad96aaf845a3c8a51c6ac))
+* **client:** add debug log helper ([5715c49](https://github.com/openai/openai-go/commit/5715c491c483f8dab4ea2a900c400384f6810024))
+
+
+### Chores
+
+* **ci:** enable for pull requests ([9ed793a](https://github.com/openai/openai-go/commit/9ed793a51010423db464a7b7bd263d2fd275967f))
+
+## 1.5.0 (2025-06-10)
+
+Full Changelog: [v1.4.0...v1.5.0](https://github.com/openai/openai-go/compare/v1.4.0...v1.5.0)
+
+### Features
+
+* **api:** Add o3-pro model IDs ([3bbd0b8](https://github.com/openai/openai-go/commit/3bbd0b8f09030a6c571900d444742c4fc2a3c211))
+
+## 1.4.0 (2025-06-09)
+
+Full Changelog: [v1.3.0...v1.4.0](https://github.com/openai/openai-go/compare/v1.3.0...v1.4.0)
+
+### Features
+
+* **client:** allow overriding unions ([27c6299](https://github.com/openai/openai-go/commit/27c6299cb4ac275c6542b5691d81b795e65eeff6))
+
+
+### Bug Fixes
+
+* **client:** cast to raw message when converting to params ([a3282b0](https://github.com/openai/openai-go/commit/a3282b01a8d9a2c0cd04f24b298bf2ffcd160ebd))
+
+## 1.3.0 (2025-06-03)
+
+Full Changelog: [v1.2.1...v1.3.0](https://github.com/openai/openai-go/compare/v1.2.1...v1.3.0)
+
+### Features
+
+* **api:** add new realtime and audio models, realtime session options ([8b8f62b](https://github.com/openai/openai-go/commit/8b8f62b8e185f3fe4aaa99e892df5d35638931a1))
+
+## 1.2.1 (2025-06-02)
+
+Full Changelog: [v1.2.0...v1.2.1](https://github.com/openai/openai-go/compare/v1.2.0...v1.2.1)
+
+### Bug Fixes
+
+* **api:** Fix evals and code interpreter interfaces ([7e244c7](https://github.com/openai/openai-go/commit/7e244c73caad6b4768cced9a798452f03b1165c8))
+* fix error ([a200fca](https://github.com/openai/openai-go/commit/a200fca92c3fa413cf724f424077d1537fa2ca3e))
+
+
+### Chores
+
+* make go mod tidy continue on error ([48f41c2](https://github.com/openai/openai-go/commit/48f41c2993bf6181018da859ae759951261f9ee2))
+
+## 1.2.0 (2025-05-29)
+
+Full Changelog: [v1.1.0...v1.2.0](https://github.com/openai/openai-go/compare/v1.1.0...v1.2.0)
+
+### Features
+
+* **api:** Config update for pakrym-stream-param ([84d59d5](https://github.com/openai/openai-go/commit/84d59d5cbc7521ddcc04435317903fd4ec3d17f6))
+
+
+### Bug Fixes
+
+* **client:** return binary content from `get /containers/{container_id}/files/{file_id}/content` ([f8c8de1](https://github.com/openai/openai-go/commit/f8c8de18b720b224267d54da53d7d919ed0fdff3))
+
+
+### Chores
+
+* deprecate Assistants API ([027470e](https://github.com/openai/openai-go/commit/027470e066ea6bbca1aeeb4fb9a8a3430babb84c))
+* **internal:** fix release workflows ([fd46533](https://github.com/openai/openai-go/commit/fd4653316312755ccab7435fca9fb0a2d8bf8fbb))
+
 ## 1.1.0 (2025-05-22)
 
 Full Changelog: [v1.0.0...v1.1.0](https://github.com/openai/openai-go/compare/v1.0.0...v1.1.0)

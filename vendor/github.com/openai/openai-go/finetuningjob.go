@@ -48,7 +48,7 @@ func NewFineTuningJobService(opts ...option.RequestOption) (r FineTuningJobServi
 // Response includes details of the enqueued job including job status and the name
 // of the fine-tuned models once complete.
 //
-// [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+// [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
 func (r *FineTuningJobService) New(ctx context.Context, body FineTuningJobNewParams, opts ...option.RequestOption) (res *FineTuningJob, err error) {
 	opts = append(r.Options[:], opts...)
 	path := "fine_tuning/jobs"
@@ -58,7 +58,7 @@ func (r *FineTuningJobService) New(ctx context.Context, body FineTuningJobNewPar
 
 // Get info about a fine-tuning job.
 //
-// [Learn more about fine-tuning](https://platform.openai.com/docs/guides/fine-tuning)
+// [Learn more about fine-tuning](https://platform.openai.com/docs/guides/model-optimization)
 func (r *FineTuningJobService) Get(ctx context.Context, fineTuningJobID string, opts ...option.RequestOption) (res *FineTuningJob, err error) {
 	opts = append(r.Options[:], opts...)
 	if fineTuningJobID == "" {
@@ -309,21 +309,21 @@ func (r *FineTuningJobHyperparameters) UnmarshalJSON(data []byte) error {
 // Use the methods beginning with 'As' to cast the union to one of its variants.
 //
 // If the underlying value is not a json object, one of the following properties
-// will be valid: OfManual OfInt]
+// will be valid: OfAuto OfInt]
 type FineTuningJobHyperparametersBatchSizeUnion struct {
 	// This field will be present if the value is a [constant.Auto] instead of an
 	// object.
-	OfManual constant.Auto `json:",inline"`
+	OfAuto constant.Auto `json:",inline"`
 	// This field will be present if the value is a [int64] instead of an object.
 	OfInt int64 `json:",inline"`
 	JSON  struct {
-		OfManual respjson.Field
-		OfInt    respjson.Field
-		raw      string
+		OfAuto respjson.Field
+		OfInt  respjson.Field
+		raw    string
 	} `json:"-"`
 }
 
-func (u FineTuningJobHyperparametersBatchSizeUnion) AsManual() (v constant.Auto) {
+func (u FineTuningJobHyperparametersBatchSizeUnion) AsAuto() (v constant.Auto) {
 	apijson.UnmarshalRoot(json.RawMessage(u.JSON.raw), &v)
 	return
 }
@@ -590,7 +590,8 @@ type FineTuningJobNewParams struct {
 	// [preference](https://platform.openai.com/docs/api-reference/fine-tuning/preference-input)
 	// format.
 	//
-	// See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+	// See the
+	// [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
 	// for more details.
 	TrainingFile string `json:"training_file,required"`
 	// The seed controls the reproducibility of the job. Passing in the same seed and
@@ -613,7 +614,8 @@ type FineTuningJobNewParams struct {
 	// Your dataset must be formatted as a JSONL file. You must upload your file with
 	// the purpose `fine-tune`.
 	//
-	// See the [fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
+	// See the
+	// [fine-tuning guide](https://platform.openai.com/docs/guides/model-optimization)
 	// for more details.
 	ValidationFile param.Opt[string] `json:"validation_file,omitzero"`
 	// A list of integrations to enable for your fine-tuning job.
@@ -688,7 +690,7 @@ type FineTuningJobNewParamsHyperparametersBatchSizeUnion struct {
 }
 
 func (u FineTuningJobNewParamsHyperparametersBatchSizeUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[FineTuningJobNewParamsHyperparametersBatchSizeUnion](u.OfAuto, u.OfInt)
+	return param.MarshalUnion(u, u.OfAuto, u.OfInt)
 }
 func (u *FineTuningJobNewParamsHyperparametersBatchSizeUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -714,7 +716,7 @@ type FineTuningJobNewParamsHyperparametersLearningRateMultiplierUnion struct {
 }
 
 func (u FineTuningJobNewParamsHyperparametersLearningRateMultiplierUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[FineTuningJobNewParamsHyperparametersLearningRateMultiplierUnion](u.OfAuto, u.OfFloat)
+	return param.MarshalUnion(u, u.OfAuto, u.OfFloat)
 }
 func (u *FineTuningJobNewParamsHyperparametersLearningRateMultiplierUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -740,7 +742,7 @@ type FineTuningJobNewParamsHyperparametersNEpochsUnion struct {
 }
 
 func (u FineTuningJobNewParamsHyperparametersNEpochsUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[FineTuningJobNewParamsHyperparametersNEpochsUnion](u.OfAuto, u.OfInt)
+	return param.MarshalUnion(u, u.OfAuto, u.OfInt)
 }
 func (u *FineTuningJobNewParamsHyperparametersNEpochsUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
