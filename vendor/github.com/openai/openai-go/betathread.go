@@ -25,9 +25,13 @@ import (
 // Note, unlike clients, this service does not read variables from the environment
 // automatically. You should not instantiate this service directly, and instead use
 // the [NewBetaThreadService] method instead.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 type BetaThreadService struct {
-	Options  []option.RequestOption
-	Runs     BetaThreadRunService
+	Options []option.RequestOption
+	// Deprecated: The Assistants API is deprecated in favor of the Responses API
+	Runs BetaThreadRunService
+	// Deprecated: The Assistants API is deprecated in favor of the Responses API
 	Messages BetaThreadMessageService
 }
 
@@ -43,6 +47,8 @@ func NewBetaThreadService(opts ...option.RequestOption) (r BetaThreadService) {
 }
 
 // Create a thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) New(ctx context.Context, body BetaThreadNewParams, opts ...option.RequestOption) (res *Thread, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -52,6 +58,8 @@ func (r *BetaThreadService) New(ctx context.Context, body BetaThreadNewParams, o
 }
 
 // Retrieves a thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) Get(ctx context.Context, threadID string, opts ...option.RequestOption) (res *Thread, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -65,6 +73,8 @@ func (r *BetaThreadService) Get(ctx context.Context, threadID string, opts ...op
 }
 
 // Modifies a thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) Update(ctx context.Context, threadID string, body BetaThreadUpdateParams, opts ...option.RequestOption) (res *Thread, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -78,6 +88,8 @@ func (r *BetaThreadService) Update(ctx context.Context, threadID string, body Be
 }
 
 // Delete a thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) Delete(ctx context.Context, threadID string, opts ...option.RequestOption) (res *ThreadDeleted, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -91,6 +103,8 @@ func (r *BetaThreadService) Delete(ctx context.Context, threadID string, opts ..
 }
 
 // Create a thread and run it in one request.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) NewAndRun(ctx context.Context, body BetaThreadNewAndRunParams, opts ...option.RequestOption) (res *Run, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -100,6 +114,8 @@ func (r *BetaThreadService) NewAndRun(ctx context.Context, body BetaThreadNewAnd
 }
 
 // Create a thread and run it in one request.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadService) NewAndRunStreaming(ctx context.Context, body BetaThreadNewAndRunParams, opts ...option.RequestOption) (stream *ssestream.Stream[AssistantStreamEventUnion]) {
 	var (
 		raw *http.Response
@@ -169,7 +185,7 @@ func (r *AssistantResponseFormatOptionUnion) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // AssistantResponseFormatOptionUnionParam.Overrides()
 func (r AssistantResponseFormatOptionUnion) ToParam() AssistantResponseFormatOptionUnionParam {
-	return param.Override[AssistantResponseFormatOptionUnionParam](r.RawJSON())
+	return param.Override[AssistantResponseFormatOptionUnionParam](json.RawMessage(r.RawJSON()))
 }
 
 func AssistantResponseFormatOptionParamOfAuto() AssistantResponseFormatOptionUnionParam {
@@ -195,7 +211,7 @@ type AssistantResponseFormatOptionUnionParam struct {
 }
 
 func (u AssistantResponseFormatOptionUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[AssistantResponseFormatOptionUnionParam](u.OfAuto, u.OfText, u.OfJSONObject, u.OfJSONSchema)
+	return param.MarshalUnion(u, u.OfAuto, u.OfText, u.OfJSONObject, u.OfJSONSchema)
 }
 func (u *AssistantResponseFormatOptionUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -263,7 +279,7 @@ func (r *AssistantToolChoice) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // AssistantToolChoiceParam.Overrides()
 func (r AssistantToolChoice) ToParam() AssistantToolChoiceParam {
-	return param.Override[AssistantToolChoiceParam](r.RawJSON())
+	return param.Override[AssistantToolChoiceParam](json.RawMessage(r.RawJSON()))
 }
 
 // The type of the tool. If type is `function`, the function name must be set
@@ -320,7 +336,7 @@ func (r *AssistantToolChoiceFunction) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // AssistantToolChoiceFunctionParam.Overrides()
 func (r AssistantToolChoiceFunction) ToParam() AssistantToolChoiceFunctionParam {
-	return param.Override[AssistantToolChoiceFunctionParam](r.RawJSON())
+	return param.Override[AssistantToolChoiceFunctionParam](json.RawMessage(r.RawJSON()))
 }
 
 // The property Name is required.
@@ -384,7 +400,7 @@ func (r *AssistantToolChoiceOptionUnion) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // AssistantToolChoiceOptionUnionParam.Overrides()
 func (r AssistantToolChoiceOptionUnion) ToParam() AssistantToolChoiceOptionUnionParam {
-	return param.Override[AssistantToolChoiceOptionUnionParam](r.RawJSON())
+	return param.Override[AssistantToolChoiceOptionUnionParam](json.RawMessage(r.RawJSON()))
 }
 
 // `none` means the model will not call any tools and instead generates a message.
@@ -416,7 +432,7 @@ type AssistantToolChoiceOptionUnionParam struct {
 }
 
 func (u AssistantToolChoiceOptionUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[AssistantToolChoiceOptionUnionParam](u.OfAuto, u.OfAssistantToolChoice)
+	return param.MarshalUnion(u, u.OfAuto, u.OfAssistantToolChoice)
 }
 func (u *AssistantToolChoiceOptionUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -627,7 +643,7 @@ type BetaThreadNewParamsMessageContentUnion struct {
 }
 
 func (u BetaThreadNewParamsMessageContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewParamsMessageContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *BetaThreadNewParamsMessageContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -668,7 +684,7 @@ type BetaThreadNewParamsMessageAttachmentToolUnion struct {
 }
 
 func (u BetaThreadNewParamsMessageAttachmentToolUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewParamsMessageAttachmentToolUnion](u.OfCodeInterpreter, u.OfFileSearch)
+	return param.MarshalUnion(u, u.OfCodeInterpreter, u.OfFileSearch)
 }
 func (u *BetaThreadNewParamsMessageAttachmentToolUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -815,7 +831,7 @@ type BetaThreadNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyUnion 
 }
 
 func (u BetaThreadNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyUnion](u.OfAuto, u.OfStatic)
+	return param.MarshalUnion(u, u.OfAuto, u.OfStatic)
 }
 func (u *BetaThreadNewParamsToolResourcesFileSearchVectorStoreChunkingStrategyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1172,7 +1188,7 @@ type BetaThreadNewAndRunParamsThreadMessageContentUnion struct {
 }
 
 func (u BetaThreadNewAndRunParamsThreadMessageContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewAndRunParamsThreadMessageContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *BetaThreadNewAndRunParamsThreadMessageContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1213,7 +1229,7 @@ type BetaThreadNewAndRunParamsThreadMessageAttachmentToolUnion struct {
 }
 
 func (u BetaThreadNewAndRunParamsThreadMessageAttachmentToolUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewAndRunParamsThreadMessageAttachmentToolUnion](u.OfCodeInterpreter, u.OfFileSearch)
+	return param.MarshalUnion(u, u.OfCodeInterpreter, u.OfFileSearch)
 }
 func (u *BetaThreadNewAndRunParamsThreadMessageAttachmentToolUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1360,7 +1376,7 @@ type BetaThreadNewAndRunParamsThreadToolResourcesFileSearchVectorStoreChunkingSt
 }
 
 func (u BetaThreadNewAndRunParamsThreadToolResourcesFileSearchVectorStoreChunkingStrategyUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadNewAndRunParamsThreadToolResourcesFileSearchVectorStoreChunkingStrategyUnion](u.OfAuto, u.OfStatic)
+	return param.MarshalUnion(u, u.OfAuto, u.OfStatic)
 }
 func (u *BetaThreadNewAndRunParamsThreadToolResourcesFileSearchVectorStoreChunkingStrategyUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)

@@ -94,6 +94,9 @@ const ChatModelGPT4oAudioPreview2024_10_01 = shared.ChatModelGPT4oAudioPreview20
 // Equals "gpt-4o-audio-preview-2024-12-17"
 const ChatModelGPT4oAudioPreview2024_12_17 = shared.ChatModelGPT4oAudioPreview2024_12_17
 
+// Equals "gpt-4o-audio-preview-2025-06-03"
+const ChatModelGPT4oAudioPreview2025_06_03 = shared.ChatModelGPT4oAudioPreview2025_06_03
+
 // Equals "gpt-4o-mini-audio-preview"
 const ChatModelGPT4oMiniAudioPreview = shared.ChatModelGPT4oMiniAudioPreview
 
@@ -411,6 +414,24 @@ const ResponsesModelO1Pro = shared.ResponsesModelO1Pro
 
 // Equals "o1-pro-2025-03-19"
 const ResponsesModelO1Pro2025_03_19 = shared.ResponsesModelO1Pro2025_03_19
+
+// Equals "o3-pro"
+const ResponsesModelO3Pro = shared.ResponsesModelO3Pro
+
+// Equals "o3-pro-2025-06-10"
+const ResponsesModelO3Pro2025_06_10 = shared.ResponsesModelO3Pro2025_06_10
+
+// Equals "o3-deep-research"
+const ResponsesModelO3DeepResearch = shared.ResponsesModelO3DeepResearch
+
+// Equals "o3-deep-research-2025-06-26"
+const ResponsesModelO3DeepResearch2025_06_26 = shared.ResponsesModelO3DeepResearch2025_06_26
+
+// Equals "o4-mini-deep-research"
+const ResponsesModelO4MiniDeepResearch = shared.ResponsesModelO4MiniDeepResearch
+
+// Equals "o4-mini-deep-research-2025-06-26"
+const ResponsesModelO4MiniDeepResearch2025_06_26 = shared.ResponsesModelO4MiniDeepResearch2025_06_26
 
 // Equals "computer-use-preview"
 const ResponsesModelComputerUsePreview = shared.ResponsesModelComputerUsePreview

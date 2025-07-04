@@ -4,6 +4,7 @@ package openai
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -174,25 +175,25 @@ type ChatCompletion struct {
 	Model string `json:"model,required"`
 	// The object type, which is always `chat.completion`.
 	Object constant.ChatCompletion `json:"object,required"`
-	// Specifies the latency tier to use for processing the request. This parameter is
-	// relevant for customers subscribed to the scale tier service:
+	// Specifies the processing type used for serving the request.
 	//
-	//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-	//     utilize scale tier credits until they are exhausted.
-	//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-	//     be processed using the default service tier with a lower uptime SLA and no
-	//     latency guarentee.
-	//   - If set to 'default', the request will be processed using the default service
-	//     tier with a lower uptime SLA and no latency guarentee.
-	//   - If set to 'flex', the request will be processed with the Flex Processing
-	//     service tier.
-	//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+	//   - If set to 'auto', then the request will be processed with the service tier
+	//     configured in the Project settings. Unless otherwise configured, the Project
+	//     will use 'default'.
+	//   - If set to 'default', then the requset will be processed with the standard
+	//     pricing and performance for the selected model.
+	//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+	//     'priority', then the request will be processed with the corresponding service
+	//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+	//     Priority processing.
 	//   - When not set, the default behavior is 'auto'.
 	//
-	// When this parameter is set, the response body will include the `service_tier`
-	// utilized.
+	// When the `service_tier` parameter is set, the response body will include the
+	// `service_tier` value based on the processing mode actually used to serve the
+	// request. This response value may be different from the value set in the
+	// parameter.
 	//
-	// Any of "auto", "default", "flex".
+	// Any of "auto", "default", "flex", "scale", "priority".
 	ServiceTier ChatCompletionServiceTier `json:"service_tier,nullable"`
 	// This fingerprint represents the backend configuration that the model runs with.
 	//
@@ -276,29 +277,31 @@ func (r *ChatCompletionChoiceLogprobs) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Specifies the latency tier to use for processing the request. This parameter is
-// relevant for customers subscribed to the scale tier service:
+// Specifies the processing type used for serving the request.
 //
-//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-//     utilize scale tier credits until they are exhausted.
-//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-//     be processed using the default service tier with a lower uptime SLA and no
-//     latency guarentee.
-//   - If set to 'default', the request will be processed using the default service
-//     tier with a lower uptime SLA and no latency guarentee.
-//   - If set to 'flex', the request will be processed with the Flex Processing
-//     service tier.
-//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+//   - If set to 'auto', then the request will be processed with the service tier
+//     configured in the Project settings. Unless otherwise configured, the Project
+//     will use 'default'.
+//   - If set to 'default', then the requset will be processed with the standard
+//     pricing and performance for the selected model.
+//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+//     'priority', then the request will be processed with the corresponding service
+//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+//     Priority processing.
 //   - When not set, the default behavior is 'auto'.
 //
-// When this parameter is set, the response body will include the `service_tier`
-// utilized.
+// When the `service_tier` parameter is set, the response body will include the
+// `service_tier` value based on the processing mode actually used to serve the
+// request. This response value may be different from the value set in the
+// parameter.
 type ChatCompletionServiceTier string
 
 const (
-	ChatCompletionServiceTierAuto    ChatCompletionServiceTier = "auto"
-	ChatCompletionServiceTierDefault ChatCompletionServiceTier = "default"
-	ChatCompletionServiceTierFlex    ChatCompletionServiceTier = "flex"
+	ChatCompletionServiceTierAuto     ChatCompletionServiceTier = "auto"
+	ChatCompletionServiceTierDefault  ChatCompletionServiceTier = "default"
+	ChatCompletionServiceTierFlex     ChatCompletionServiceTier = "flex"
+	ChatCompletionServiceTierScale    ChatCompletionServiceTier = "scale"
+	ChatCompletionServiceTierPriority ChatCompletionServiceTier = "priority"
 )
 
 // Messages sent by the model in response to user messages.
@@ -366,7 +369,7 @@ type ChatCompletionAssistantMessageParamContentUnion struct {
 }
 
 func (u ChatCompletionAssistantMessageParamContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionAssistantMessageParamContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionAssistantMessageParamContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -391,7 +394,7 @@ type ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion struct {
 }
 
 func (u ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion](u.OfText, u.OfRefusal)
+	return param.MarshalUnion(u, u.OfText, u.OfRefusal)
 }
 func (u *ChatCompletionAssistantMessageParamContentArrayOfContentPartUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -569,25 +572,25 @@ type ChatCompletionChunk struct {
 	Model string `json:"model,required"`
 	// The object type, which is always `chat.completion.chunk`.
 	Object constant.ChatCompletionChunk `json:"object,required"`
-	// Specifies the latency tier to use for processing the request. This parameter is
-	// relevant for customers subscribed to the scale tier service:
+	// Specifies the processing type used for serving the request.
 	//
-	//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-	//     utilize scale tier credits until they are exhausted.
-	//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-	//     be processed using the default service tier with a lower uptime SLA and no
-	//     latency guarentee.
-	//   - If set to 'default', the request will be processed using the default service
-	//     tier with a lower uptime SLA and no latency guarentee.
-	//   - If set to 'flex', the request will be processed with the Flex Processing
-	//     service tier.
-	//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+	//   - If set to 'auto', then the request will be processed with the service tier
+	//     configured in the Project settings. Unless otherwise configured, the Project
+	//     will use 'default'.
+	//   - If set to 'default', then the requset will be processed with the standard
+	//     pricing and performance for the selected model.
+	//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+	//     'priority', then the request will be processed with the corresponding service
+	//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+	//     Priority processing.
 	//   - When not set, the default behavior is 'auto'.
 	//
-	// When this parameter is set, the response body will include the `service_tier`
-	// utilized.
+	// When the `service_tier` parameter is set, the response body will include the
+	// `service_tier` value based on the processing mode actually used to serve the
+	// request. This response value may be different from the value set in the
+	// parameter.
 	//
-	// Any of "auto", "default", "flex".
+	// Any of "auto", "default", "flex", "scale", "priority".
 	ServiceTier ChatCompletionChunkServiceTier `json:"service_tier,nullable"`
 	// This fingerprint represents the backend configuration that the model runs with.
 	// Can be used in conjunction with the `seed` request parameter to understand when
@@ -786,29 +789,31 @@ func (r *ChatCompletionChunkChoiceLogprobs) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
 
-// Specifies the latency tier to use for processing the request. This parameter is
-// relevant for customers subscribed to the scale tier service:
+// Specifies the processing type used for serving the request.
 //
-//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-//     utilize scale tier credits until they are exhausted.
-//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-//     be processed using the default service tier with a lower uptime SLA and no
-//     latency guarentee.
-//   - If set to 'default', the request will be processed using the default service
-//     tier with a lower uptime SLA and no latency guarentee.
-//   - If set to 'flex', the request will be processed with the Flex Processing
-//     service tier.
-//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+//   - If set to 'auto', then the request will be processed with the service tier
+//     configured in the Project settings. Unless otherwise configured, the Project
+//     will use 'default'.
+//   - If set to 'default', then the requset will be processed with the standard
+//     pricing and performance for the selected model.
+//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+//     'priority', then the request will be processed with the corresponding service
+//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+//     Priority processing.
 //   - When not set, the default behavior is 'auto'.
 //
-// When this parameter is set, the response body will include the `service_tier`
-// utilized.
+// When the `service_tier` parameter is set, the response body will include the
+// `service_tier` value based on the processing mode actually used to serve the
+// request. This response value may be different from the value set in the
+// parameter.
 type ChatCompletionChunkServiceTier string
 
 const (
-	ChatCompletionChunkServiceTierAuto    ChatCompletionChunkServiceTier = "auto"
-	ChatCompletionChunkServiceTierDefault ChatCompletionChunkServiceTier = "default"
-	ChatCompletionChunkServiceTierFlex    ChatCompletionChunkServiceTier = "flex"
+	ChatCompletionChunkServiceTierAuto     ChatCompletionChunkServiceTier = "auto"
+	ChatCompletionChunkServiceTierDefault  ChatCompletionChunkServiceTier = "default"
+	ChatCompletionChunkServiceTierFlex     ChatCompletionChunkServiceTier = "flex"
+	ChatCompletionChunkServiceTierScale    ChatCompletionChunkServiceTier = "scale"
+	ChatCompletionChunkServiceTierPriority ChatCompletionChunkServiceTier = "priority"
 )
 
 func TextContentPart(text string) ChatCompletionContentPartUnionParam {
@@ -847,7 +852,7 @@ type ChatCompletionContentPartUnionParam struct {
 }
 
 func (u ChatCompletionContentPartUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionContentPartUnionParam](u.OfText, u.OfImageURL, u.OfInputAudio, u.OfFile)
+	return param.MarshalUnion(u, u.OfText, u.OfImageURL, u.OfInputAudio, u.OfFile)
 }
 func (u *ChatCompletionContentPartUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1153,7 +1158,7 @@ type ChatCompletionDeveloperMessageParamContentUnion struct {
 }
 
 func (u ChatCompletionDeveloperMessageParamContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionDeveloperMessageParamContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionDeveloperMessageParamContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1439,7 +1444,7 @@ type ChatCompletionMessageParamUnion struct {
 }
 
 func (u ChatCompletionMessageParamUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionMessageParamUnion](u.OfDeveloper,
+	return param.MarshalUnion(u, u.OfDeveloper,
 		u.OfSystem,
 		u.OfUser,
 		u.OfAssistant,
@@ -1620,7 +1625,7 @@ func (r *ChatCompletionMessageToolCall) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // ChatCompletionMessageToolCallParam.Overrides()
 func (r ChatCompletionMessageToolCall) ToParam() ChatCompletionMessageToolCallParam {
-	return param.Override[ChatCompletionMessageToolCallParam](r.RawJSON())
+	return param.Override[ChatCompletionMessageToolCallParam](json.RawMessage(r.RawJSON()))
 }
 
 // The function that the model called.
@@ -1761,7 +1766,7 @@ type ChatCompletionPredictionContentContentUnionParam struct {
 }
 
 func (u ChatCompletionPredictionContentContentUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionPredictionContentContentUnionParam](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionPredictionContentContentUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1852,7 +1857,7 @@ type ChatCompletionSystemMessageParamContentUnion struct {
 }
 
 func (u ChatCompletionSystemMessageParamContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionSystemMessageParamContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionSystemMessageParamContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1963,7 +1968,7 @@ type ChatCompletionToolChoiceOptionUnionParam struct {
 }
 
 func (u ChatCompletionToolChoiceOptionUnionParam) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionToolChoiceOptionUnionParam](u.OfAuto, u.OfChatCompletionNamedToolChoice)
+	return param.MarshalUnion(u, u.OfAuto, u.OfChatCompletionNamedToolChoice)
 }
 func (u *ChatCompletionToolChoiceOptionUnionParam) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -2020,7 +2025,7 @@ type ChatCompletionToolMessageParamContentUnion struct {
 }
 
 func (u ChatCompletionToolMessageParamContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionToolMessageParamContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionToolMessageParamContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -2070,7 +2075,7 @@ type ChatCompletionUserMessageParamContentUnion struct {
 }
 
 func (u ChatCompletionUserMessageParamContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionUserMessageParamContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *ChatCompletionUserMessageParamContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -2136,6 +2141,8 @@ type ChatCompletionNewParams struct {
 	// Whether or not to store the output of this chat completion request for use in
 	// our [model distillation](https://platform.openai.com/docs/guides/distillation)
 	// or [evals](https://platform.openai.com/docs/guides/evals) products.
+	//
+	// Supports text and image inputs. Note: image inputs over 10MB will be dropped.
 	Store param.Opt[bool] `json:"store,omitzero"`
 	// What sampling temperature to use, between 0 and 2. Higher values like 0.8 will
 	// make the output more random, while lower values like 0.2 will make it more
@@ -2202,25 +2209,25 @@ type ChatCompletionNewParams struct {
 	//
 	// Any of "low", "medium", "high".
 	ReasoningEffort shared.ReasoningEffort `json:"reasoning_effort,omitzero"`
-	// Specifies the latency tier to use for processing the request. This parameter is
-	// relevant for customers subscribed to the scale tier service:
+	// Specifies the processing type used for serving the request.
 	//
-	//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-	//     utilize scale tier credits until they are exhausted.
-	//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-	//     be processed using the default service tier with a lower uptime SLA and no
-	//     latency guarentee.
-	//   - If set to 'default', the request will be processed using the default service
-	//     tier with a lower uptime SLA and no latency guarentee.
-	//   - If set to 'flex', the request will be processed with the Flex Processing
-	//     service tier.
-	//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+	//   - If set to 'auto', then the request will be processed with the service tier
+	//     configured in the Project settings. Unless otherwise configured, the Project
+	//     will use 'default'.
+	//   - If set to 'default', then the requset will be processed with the standard
+	//     pricing and performance for the selected model.
+	//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+	//     'priority', then the request will be processed with the corresponding service
+	//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+	//     Priority processing.
 	//   - When not set, the default behavior is 'auto'.
 	//
-	// When this parameter is set, the response body will include the `service_tier`
-	// utilized.
+	// When the `service_tier` parameter is set, the response body will include the
+	// `service_tier` value based on the processing mode actually used to serve the
+	// request. This response value may be different from the value set in the
+	// parameter.
 	//
-	// Any of "auto", "default", "flex".
+	// Any of "auto", "default", "flex", "scale", "priority".
 	ServiceTier ChatCompletionNewParamsServiceTier `json:"service_tier,omitzero"`
 	// Not supported with latest reasoning models `o3` and `o4-mini`.
 	//
@@ -2302,7 +2309,7 @@ type ChatCompletionNewParamsFunctionCallUnion struct {
 }
 
 func (u ChatCompletionNewParamsFunctionCallUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionNewParamsFunctionCallUnion](u.OfFunctionCallMode, u.OfFunctionCallOption)
+	return param.MarshalUnion(u, u.OfFunctionCallMode, u.OfFunctionCallOption)
 }
 func (u *ChatCompletionNewParamsFunctionCallUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -2367,7 +2374,7 @@ type ChatCompletionNewParamsResponseFormatUnion struct {
 }
 
 func (u ChatCompletionNewParamsResponseFormatUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionNewParamsResponseFormatUnion](u.OfText, u.OfJSONSchema, u.OfJSONObject)
+	return param.MarshalUnion(u, u.OfText, u.OfJSONSchema, u.OfJSONObject)
 }
 func (u *ChatCompletionNewParamsResponseFormatUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -2404,29 +2411,31 @@ func (u ChatCompletionNewParamsResponseFormatUnion) GetType() *string {
 	return nil
 }
 
-// Specifies the latency tier to use for processing the request. This parameter is
-// relevant for customers subscribed to the scale tier service:
+// Specifies the processing type used for serving the request.
 //
-//   - If set to 'auto', and the Project is Scale tier enabled, the system will
-//     utilize scale tier credits until they are exhausted.
-//   - If set to 'auto', and the Project is not Scale tier enabled, the request will
-//     be processed using the default service tier with a lower uptime SLA and no
-//     latency guarentee.
-//   - If set to 'default', the request will be processed using the default service
-//     tier with a lower uptime SLA and no latency guarentee.
-//   - If set to 'flex', the request will be processed with the Flex Processing
-//     service tier.
-//     [Learn more](https://platform.openai.com/docs/guides/flex-processing).
+//   - If set to 'auto', then the request will be processed with the service tier
+//     configured in the Project settings. Unless otherwise configured, the Project
+//     will use 'default'.
+//   - If set to 'default', then the requset will be processed with the standard
+//     pricing and performance for the selected model.
+//   - If set to '[flex](https://platform.openai.com/docs/guides/flex-processing)' or
+//     'priority', then the request will be processed with the corresponding service
+//     tier. [Contact sales](https://openai.com/contact-sales) to learn more about
+//     Priority processing.
 //   - When not set, the default behavior is 'auto'.
 //
-// When this parameter is set, the response body will include the `service_tier`
-// utilized.
+// When the `service_tier` parameter is set, the response body will include the
+// `service_tier` value based on the processing mode actually used to serve the
+// request. This response value may be different from the value set in the
+// parameter.
 type ChatCompletionNewParamsServiceTier string
 
 const (
-	ChatCompletionNewParamsServiceTierAuto    ChatCompletionNewParamsServiceTier = "auto"
-	ChatCompletionNewParamsServiceTierDefault ChatCompletionNewParamsServiceTier = "default"
-	ChatCompletionNewParamsServiceTierFlex    ChatCompletionNewParamsServiceTier = "flex"
+	ChatCompletionNewParamsServiceTierAuto     ChatCompletionNewParamsServiceTier = "auto"
+	ChatCompletionNewParamsServiceTierDefault  ChatCompletionNewParamsServiceTier = "default"
+	ChatCompletionNewParamsServiceTierFlex     ChatCompletionNewParamsServiceTier = "flex"
+	ChatCompletionNewParamsServiceTierScale    ChatCompletionNewParamsServiceTier = "scale"
+	ChatCompletionNewParamsServiceTierPriority ChatCompletionNewParamsServiceTier = "priority"
 )
 
 // Only one field can be non-zero.
@@ -2439,7 +2448,7 @@ type ChatCompletionNewParamsStopUnion struct {
 }
 
 func (u ChatCompletionNewParamsStopUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ChatCompletionNewParamsStopUnion](u.OfString, u.OfStringArray)
+	return param.MarshalUnion(u, u.OfString, u.OfStringArray)
 }
 func (u *ChatCompletionNewParamsStopUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
