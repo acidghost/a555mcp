@@ -55,7 +55,11 @@ var (
 			if err != nil {
 				log.Error("Failed to log to file", "err", err)
 			} else {
-				defer logFile.Close()
+				defer func() {
+					if err := logFile.Close(); err != nil {
+						log.Warn("Cannot close logfile", "path", logFile.Name(), "err", err)
+					}
+				}()
 			}
 			log.Info("Logging to file", "path", logFile.Name())
 
@@ -148,7 +152,11 @@ var (
 				if err != nil {
 					return nil, err
 				}
-				defer file.Close()
+				defer func() {
+					if err := file.Close(); err != nil {
+						log.Warn("Failed to close exfil file", "path", file.Name(), "err", err)
+					}
+				}()
 				x, err := req.RequireString("argument")
 				if err != nil {
 					return nil, fmt.Errorf("failed to get quote: %w", err)
@@ -341,9 +349,13 @@ func NewModel() (model, error) {
 		log.Debug("Initializing MCP client", "server", name)
 		_, err = c.Initialize(ctx, initRequest)
 		if err != nil {
-			c.Close()
+			if err := c.Close(); err != nil {
+				log.Warn("Failed to close MCP client", "err", err)
+			}
 			for _, c := range m.clients {
-				c.Close()
+				if err := c.Close(); err != nil {
+					log.Warn("Failed to close other MCP client", "err", err)
+				}
 			}
 			return m, fmt.Errorf("failed to initialize MCP client for %s: %w", name, err)
 		}
@@ -395,8 +407,12 @@ func (t LoggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, erro
 			log.Error("Failed to read request body", "err", err)
 			return nil, err
 		}
-		req.Body.Close()                                    // close the original body
-		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // restore the body
+		// close the original body
+		if err := req.Body.Close(); err != nil {
+			log.Warn("Failed to close request body", "err", err)
+		}
+		// restore the body
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		reqBody = string(bodyBytes)
 	}
 	log.Debug("HTTP Request", "method", req.Method, "url", req.URL.String(), "body", reqBody)
@@ -412,8 +428,12 @@ func (t LoggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, erro
 			log.Error("Failed to read response body", "err", err)
 			return nil, err
 		}
-		resp.Body.Close()                                        // close the original body
-		resp.Body = io.NopCloser(bytes.NewBuffer(respBodyBytes)) // restore the body
+		// close the original body
+		if err := resp.Body.Close(); err != nil {
+			log.Warn("Failed to close response body", "err", err)
+		}
+		// restore the body
+		resp.Body = io.NopCloser(bytes.NewBuffer(respBodyBytes))
 		respBody = string(respBodyBytes)
 	}
 	log.Debug("HTTP Response", "status", resp.Status, "body", respBody)
