@@ -21,6 +21,13 @@ import (
 
 type StreamableHTTPCOption func(*StreamableHTTP)
 
+// WithHTTPClient sets a custom HTTP client on the StreamableHTTP transport.
+func WithHTTPBasicClient(client *http.Client) StreamableHTTPCOption {
+	return func(sc *StreamableHTTP) {
+		sc.httpClient = client
+	}
+}
+
 func WithHTTPHeaders(headers map[string]string) StreamableHTTPCOption {
 	return func(sc *StreamableHTTP) {
 		sc.headers = headers
@@ -40,8 +47,8 @@ func WithHTTPTimeout(timeout time.Duration) StreamableHTTPCOption {
 	}
 }
 
-// WithOAuth enables OAuth authentication for the client.
-func WithOAuth(config OAuthConfig) StreamableHTTPCOption {
+// WithHTTPOAuth enables OAuth authentication for the client.
+func WithHTTPOAuth(config OAuthConfig) StreamableHTTPCOption {
 	return func(sc *StreamableHTTP) {
 		sc.oauthHandler = NewOAuthHandler(config)
 	}
@@ -373,7 +380,11 @@ func (c *StreamableHTTP) readSSE(ctx context.Context, reader io.ReadCloser, hand
 			if err != nil {
 				if err == io.EOF {
 					// Process any pending event before exit
-					if event != "" && data != "" {
+					if data != "" {
+						// If no event type is specified, use empty string (default event type)
+						if event == "" {
+							event = "message"
+						}
 						handler(event, data)
 					}
 					return
@@ -391,7 +402,11 @@ func (c *StreamableHTTP) readSSE(ctx context.Context, reader io.ReadCloser, hand
 			line = strings.TrimRight(line, "\r\n")
 			if line == "" {
 				// Empty line means end of event
-				if event != "" && data != "" {
+				if data != "" {
+					// If no event type is specified, use empty string (default event type)
+					if event == "" {
+						event = "message"
+					}
 					handler(event, data)
 					event = ""
 					data = ""
