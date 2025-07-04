@@ -27,6 +27,8 @@ import (
 // Note, unlike clients, this service does not read variables from the environment
 // automatically. You should not instantiate this service directly, and instead use
 // the [NewBetaThreadMessageService] method instead.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 type BetaThreadMessageService struct {
 	Options []option.RequestOption
 }
@@ -41,6 +43,8 @@ func NewBetaThreadMessageService(opts ...option.RequestOption) (r BetaThreadMess
 }
 
 // Create a message.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) New(ctx context.Context, threadID string, body BetaThreadMessageNewParams, opts ...option.RequestOption) (res *Message, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -54,6 +58,8 @@ func (r *BetaThreadMessageService) New(ctx context.Context, threadID string, bod
 }
 
 // Retrieve a message.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) Get(ctx context.Context, threadID string, messageID string, opts ...option.RequestOption) (res *Message, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -71,6 +77,8 @@ func (r *BetaThreadMessageService) Get(ctx context.Context, threadID string, mes
 }
 
 // Modifies a message.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) Update(ctx context.Context, threadID string, messageID string, body BetaThreadMessageUpdateParams, opts ...option.RequestOption) (res *Message, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -88,6 +96,8 @@ func (r *BetaThreadMessageService) Update(ctx context.Context, threadID string, 
 }
 
 // Returns a list of messages for a given thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) List(ctx context.Context, threadID string, query BetaThreadMessageListParams, opts ...option.RequestOption) (res *pagination.CursorPage[Message], err error) {
 	var raw *http.Response
 	opts = append(r.Options[:], opts...)
@@ -110,11 +120,15 @@ func (r *BetaThreadMessageService) List(ctx context.Context, threadID string, qu
 }
 
 // Returns a list of messages for a given thread.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) ListAutoPaging(ctx context.Context, threadID string, query BetaThreadMessageListParams, opts ...option.RequestOption) *pagination.CursorPageAutoPager[Message] {
 	return pagination.NewCursorPageAutoPager(r.List(ctx, threadID, query, opts...))
 }
 
 // Deletes a message.
+//
+// Deprecated: The Assistants API is deprecated in favor of the Responses API
 func (r *BetaThreadMessageService) Delete(ctx context.Context, threadID string, messageID string, opts ...option.RequestOption) (res *MessageDeleted, err error) {
 	opts = append(r.Options[:], opts...)
 	opts = append([]option.RequestOption{option.WithHeader("OpenAI-Beta", "assistants=v2")}, opts...)
@@ -497,7 +511,7 @@ func (r *ImageFile) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // ImageFileParam.Overrides()
 func (r ImageFile) ToParam() ImageFileParam {
-	return param.Override[ImageFileParam](r.RawJSON())
+	return param.Override[ImageFileParam](json.RawMessage(r.RawJSON()))
 }
 
 // Specifies the detail level of the image if specified by the user. `low` uses
@@ -559,7 +573,7 @@ func (r *ImageFileContentBlock) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // ImageFileContentBlockParam.Overrides()
 func (r ImageFileContentBlock) ToParam() ImageFileContentBlockParam {
-	return param.Override[ImageFileContentBlockParam](r.RawJSON())
+	return param.Override[ImageFileContentBlockParam](json.RawMessage(r.RawJSON()))
 }
 
 // References an image [File](https://platform.openai.com/docs/api-reference/files)
@@ -672,7 +686,7 @@ func (r *ImageURL) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // ImageURLParam.Overrides()
 func (r ImageURL) ToParam() ImageURLParam {
-	return param.Override[ImageURLParam](r.RawJSON())
+	return param.Override[ImageURLParam](json.RawMessage(r.RawJSON()))
 }
 
 // Specifies the detail level of the image. `low` uses fewer tokens, you can opt in
@@ -732,7 +746,7 @@ func (r *ImageURLContentBlock) UnmarshalJSON(data []byte) error {
 // be used at the last possible moment before sending a request. Test for this with
 // ImageURLContentBlockParam.Overrides()
 func (r ImageURLContentBlock) ToParam() ImageURLContentBlockParam {
-	return param.Override[ImageURLContentBlockParam](r.RawJSON())
+	return param.Override[ImageURLContentBlockParam](json.RawMessage(r.RawJSON()))
 }
 
 // References an image URL in the content of a message.
@@ -1202,7 +1216,7 @@ type MessageContentPartParamUnion struct {
 }
 
 func (u MessageContentPartParamUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[MessageContentPartParamUnion](u.OfImageFile, u.OfImageURL, u.OfText)
+	return param.MarshalUnion(u, u.OfImageFile, u.OfImageURL, u.OfText)
 }
 func (u *MessageContentPartParamUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1527,7 +1541,7 @@ type BetaThreadMessageNewParamsContentUnion struct {
 }
 
 func (u BetaThreadMessageNewParamsContentUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadMessageNewParamsContentUnion](u.OfString, u.OfArrayOfContentParts)
+	return param.MarshalUnion(u, u.OfString, u.OfArrayOfContentParts)
 }
 func (u *BetaThreadMessageNewParamsContentUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -1581,7 +1595,7 @@ type BetaThreadMessageNewParamsAttachmentToolUnion struct {
 }
 
 func (u BetaThreadMessageNewParamsAttachmentToolUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[BetaThreadMessageNewParamsAttachmentToolUnion](u.OfCodeInterpreter, u.OfFileSearch)
+	return param.MarshalUnion(u, u.OfCodeInterpreter, u.OfFileSearch)
 }
 func (u *BetaThreadMessageNewParamsAttachmentToolUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)

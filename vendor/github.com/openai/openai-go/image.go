@@ -102,17 +102,39 @@ const (
 type ImagesResponse struct {
 	// The Unix timestamp (in seconds) of when the image was created.
 	Created int64 `json:"created,required"`
+	// The background parameter used for the image generation. Either `transparent` or
+	// `opaque`.
+	//
+	// Any of "transparent", "opaque".
+	Background ImagesResponseBackground `json:"background"`
 	// The list of generated images.
 	Data []Image `json:"data"`
+	// The output format of the image generation. Either `png`, `webp`, or `jpeg`.
+	//
+	// Any of "png", "webp", "jpeg".
+	OutputFormat ImagesResponseOutputFormat `json:"output_format"`
+	// The quality of the image generated. Either `low`, `medium`, or `high`.
+	//
+	// Any of "low", "medium", "high".
+	Quality ImagesResponseQuality `json:"quality"`
+	// The size of the image generated. Either `1024x1024`, `1024x1536`, or
+	// `1536x1024`.
+	//
+	// Any of "1024x1024", "1024x1536", "1536x1024".
+	Size ImagesResponseSize `json:"size"`
 	// For `gpt-image-1` only, the token usage information for the image generation.
 	Usage ImagesResponseUsage `json:"usage"`
 	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		Created     respjson.Field
-		Data        respjson.Field
-		Usage       respjson.Field
-		ExtraFields map[string]respjson.Field
-		raw         string
+		Created      respjson.Field
+		Background   respjson.Field
+		Data         respjson.Field
+		OutputFormat respjson.Field
+		Quality      respjson.Field
+		Size         respjson.Field
+		Usage        respjson.Field
+		ExtraFields  map[string]respjson.Field
+		raw          string
 	} `json:"-"`
 }
 
@@ -121,6 +143,43 @@ func (r ImagesResponse) RawJSON() string { return r.JSON.raw }
 func (r *ImagesResponse) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, r)
 }
+
+// The background parameter used for the image generation. Either `transparent` or
+// `opaque`.
+type ImagesResponseBackground string
+
+const (
+	ImagesResponseBackgroundTransparent ImagesResponseBackground = "transparent"
+	ImagesResponseBackgroundOpaque      ImagesResponseBackground = "opaque"
+)
+
+// The output format of the image generation. Either `png`, `webp`, or `jpeg`.
+type ImagesResponseOutputFormat string
+
+const (
+	ImagesResponseOutputFormatPNG  ImagesResponseOutputFormat = "png"
+	ImagesResponseOutputFormatWebP ImagesResponseOutputFormat = "webp"
+	ImagesResponseOutputFormatJPEG ImagesResponseOutputFormat = "jpeg"
+)
+
+// The quality of the image generated. Either `low`, `medium`, or `high`.
+type ImagesResponseQuality string
+
+const (
+	ImagesResponseQualityLow    ImagesResponseQuality = "low"
+	ImagesResponseQualityMedium ImagesResponseQuality = "medium"
+	ImagesResponseQualityHigh   ImagesResponseQuality = "high"
+)
+
+// The size of the image generated. Either `1024x1024`, `1024x1536`, or
+// `1536x1024`.
+type ImagesResponseSize string
+
+const (
+	ImagesResponseSize1024x1024 ImagesResponseSize = "1024x1024"
+	ImagesResponseSize1024x1536 ImagesResponseSize = "1024x1536"
+	ImagesResponseSize1536x1024 ImagesResponseSize = "1536x1024"
+)
 
 // For `gpt-image-1` only, the token usage information for the image generation.
 type ImagesResponseUsage struct {
@@ -239,7 +298,7 @@ type ImageEditParams struct {
 	// The image(s) to edit. Must be a supported image file or an array of images.
 	//
 	// For `gpt-image-1`, each image should be a `png`, `webp`, or `jpg` file less than
-	// 25MB. You can provide up to 16 images.
+	// 50MB. You can provide up to 16 images.
 	//
 	// For `dall-e-2`, you can only provide one image, and it should be a square `png`
 	// file less than 4MB.
@@ -249,6 +308,10 @@ type ImageEditParams struct {
 	Prompt string `json:"prompt,required"`
 	// The number of images to generate. Must be between 1 and 10.
 	N param.Opt[int64] `json:"n,omitzero"`
+	// The compression level (0-100%) for the generated images. This parameter is only
+	// supported for `gpt-image-1` with the `webp` or `jpeg` output formats, and
+	// defaults to 100.
+	OutputCompression param.Opt[int64] `json:"output_compression,omitzero"`
 	// A unique identifier representing your end-user, which can help OpenAI to monitor
 	// and detect abuse.
 	// [Learn more](https://platform.openai.com/docs/guides/safety-best-practices#end-user-ids).
@@ -267,6 +330,12 @@ type ImageEditParams struct {
 	// supported. Defaults to `dall-e-2` unless a parameter specific to `gpt-image-1`
 	// is used.
 	Model ImageModel `json:"model,omitzero"`
+	// The format in which the generated images are returned. This parameter is only
+	// supported for `gpt-image-1`. Must be one of `png`, `jpeg`, or `webp`. The
+	// default value is `png`.
+	//
+	// Any of "png", "jpeg", "webp".
+	OutputFormat ImageEditParamsOutputFormat `json:"output_format,omitzero"`
 	// The quality of the image that will be generated. `high`, `medium` and `low` are
 	// only supported for `gpt-image-1`. `dall-e-2` only supports `standard` quality.
 	// Defaults to `auto`.
@@ -322,7 +391,7 @@ type ImageEditParamsImageUnion struct {
 }
 
 func (u ImageEditParamsImageUnion) MarshalJSON() ([]byte, error) {
-	return param.MarshalUnion[ImageEditParamsImageUnion](u.OfFile, u.OfFileArray)
+	return param.MarshalUnion(u, u.OfFile, u.OfFileArray)
 }
 func (u *ImageEditParamsImageUnion) UnmarshalJSON(data []byte) error {
 	return apijson.UnmarshalRoot(data, u)
@@ -350,6 +419,17 @@ const (
 	ImageEditParamsBackgroundTransparent ImageEditParamsBackground = "transparent"
 	ImageEditParamsBackgroundOpaque      ImageEditParamsBackground = "opaque"
 	ImageEditParamsBackgroundAuto        ImageEditParamsBackground = "auto"
+)
+
+// The format in which the generated images are returned. This parameter is only
+// supported for `gpt-image-1`. Must be one of `png`, `jpeg`, or `webp`. The
+// default value is `png`.
+type ImageEditParamsOutputFormat string
+
+const (
+	ImageEditParamsOutputFormatPNG  ImageEditParamsOutputFormat = "png"
+	ImageEditParamsOutputFormatJPEG ImageEditParamsOutputFormat = "jpeg"
+	ImageEditParamsOutputFormatWebP ImageEditParamsOutputFormat = "webp"
 )
 
 // The quality of the image that will be generated. `high`, `medium` and `low` are
