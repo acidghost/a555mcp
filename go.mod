@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/log v0.4.2
 	github.com/mark3labs/mcp-go v0.32.0
-	github.com/openai/openai-go v1.8.2
+	github.com/openai/openai-go v1.8.3
 	github.com/spf13/cobra v1.9.1
 )
 
