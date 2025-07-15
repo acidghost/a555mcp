@@ -22,7 +22,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Setup Just
-        uses: taiki-e/install-action@21517c4e721ab8b872d9b8e90828e584dcabe8e2 # v2.56.3
+        uses: taiki-e/install-action@2790298ea2e5d83ad59ad1ea90fac1df6f79f605 # v2.56.14
         with:
           tool: just
 
