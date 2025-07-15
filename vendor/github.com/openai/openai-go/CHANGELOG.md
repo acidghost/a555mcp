@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.10.3 (2025-07-15)
+
+Full Changelog: [v1.10.2...v1.10.3](https://github.com/openai/openai-go/compare/v1.10.2...v1.10.3)
+
+## 1.10.2 (2025-07-15)
+
+Full Changelog: [v1.10.1...v1.10.2](https://github.com/openai/openai-go/compare/v1.10.1...v1.10.2)
+
+### Chores
+
+* **api:** update realtime specs, build config ([3d2afda](https://github.com/openai/openai-go/commit/3d2afda006bd1f9e7ebde27b2873efa67e5e480d))
+
+## 1.10.1 (2025-07-11)
+
+Full Changelog: [v1.10.0...v1.10.1](https://github.com/openai/openai-go/compare/v1.10.0...v1.10.1)
+
+### Chores
+
+* **api:** specification cleanup ([5dbf6d2](https://github.com/openai/openai-go/commit/5dbf6d2cebe770d980db7888d705d1642ccd9cbc))
+* lint tests in subpackages ([02f440d](https://github.com/openai/openai-go/commit/02f440dc6d899d7816b9fec9c47c09b393a7dd6c))
+
 ## 1.10.0 (2025-07-10)
 
 Full Changelog: [v1.9.0...v1.10.0](https://github.com/openai/openai-go/compare/v1.9.0...v1.10.0)
