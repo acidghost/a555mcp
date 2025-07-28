@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -237,7 +238,7 @@ func (c *Stdio) readResponses() {
 		default:
 			line, err := c.stdout.ReadString('\n')
 			if err != nil {
-				if err != io.EOF {
+				if err != io.EOF && !errors.Is(err, context.Canceled) {
 					fmt.Printf("Error reading response: %v\n", err)
 				}
 				return
@@ -307,6 +308,13 @@ func (c *Stdio) SendRequest(
 	ctx context.Context,
 	request JSONRPCRequest,
 ) (*JSONRPCResponse, error) {
+	// Check if context is already canceled before doing any work
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	if c.stdin == nil {
 		return nil, fmt.Errorf("stdio client not started")
 	}
