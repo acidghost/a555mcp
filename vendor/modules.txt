@@ -33,8 +33,8 @@ github.com/charmbracelet/bubbles/spinner
 github.com/charmbracelet/bubbles/textarea
 github.com/charmbracelet/bubbles/textarea/memoization
 github.com/charmbracelet/bubbles/viewport
-# github.com/charmbracelet/bubbletea v1.3.6
-## explicit; go 1.23.0
+# github.com/charmbracelet/bubbletea v1.3.10
+## explicit; go 1.24.0
 github.com/charmbracelet/bubbletea
 # github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc
 ## explicit; go 1.18
@@ -52,10 +52,9 @@ github.com/charmbracelet/lipgloss/table
 # github.com/charmbracelet/log v0.4.2
 ## explicit; go 1.19
 github.com/charmbracelet/log
-# github.com/charmbracelet/x/ansi v0.9.3
+# github.com/charmbracelet/x/ansi v0.10.1
 ## explicit; go 1.23.0
 github.com/charmbracelet/x/ansi
-github.com/charmbracelet/x/ansi/kitty
 github.com/charmbracelet/x/ansi/parser
 # github.com/charmbracelet/x/cellbuf v0.0.13
 ## explicit; go 1.18
@@ -95,8 +94,8 @@ github.com/lucasb-eyer/go-colorful
 ## explicit; go 1.12
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jwriter
-# github.com/mark3labs/mcp-go v0.38.0
-## explicit; go 1.23
+# github.com/mark3labs/mcp-go v0.42.0
+## explicit; go 1.23.0
 github.com/mark3labs/mcp-go/client
 github.com/mark3labs/mcp-go/client/transport
 github.com/mark3labs/mcp-go/mcp
@@ -212,11 +211,8 @@ golang.org/x/exp/slog/internal/buffer
 ## explicit; go 1.23.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
-# golang.org/x/sync v0.15.0
-## explicit; go 1.23.0
-golang.org/x/sync/errgroup
-# golang.org/x/sys v0.33.0
-## explicit; go 1.23.0
+# golang.org/x/sys v0.36.0
+## explicit; go 1.24.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
