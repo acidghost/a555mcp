@@ -21,6 +21,8 @@ var ErrNoToken = errors.New("no token available")
 type OAuthConfig struct {
 	// ClientID is the OAuth client ID
 	ClientID string
+	// ClientURI is the URI of the client
+	ClientURI string
 	// ClientSecret is the OAuth client secret (for confidential clients)
 	ClientSecret string
 	// RedirectURI is the redirect URI for the OAuth flow
@@ -144,6 +146,7 @@ type OAuthHandler struct {
 	metadataFetchErr error
 	metadataOnce     sync.Once
 	baseURL          string
+	resourceURL      string // RFC 8707 resource indicator; set from protected resource metadata
 
 	mu            sync.RWMutex // Protects expectedState
 	expectedState string       // Expected state value for CSRF protection
@@ -171,9 +174,10 @@ func (h *OAuthHandler) GetAuthorizationHeader(ctx context.Context) (string, erro
 		return "", err
 	}
 
-	// Some auth implementations are strict about token type
+	// Per RFC 6749 §5.1, token_type is case-insensitive.
+	// Normalize to "Bearer" for strict implementations.
 	tokenType := token.TokenType
-	if tokenType == "bearer" {
+	if strings.EqualFold(tokenType, "bearer") {
 		tokenType = "Bearer"
 	}
 
@@ -217,6 +221,10 @@ func (h *OAuthHandler) refreshToken(ctx context.Context, refreshToken string) (*
 	if h.config.ClientSecret != "" {
 		data.Set("client_secret", h.config.ClientSecret)
 	}
+	// RFC 8707: Include resource parameter on refresh requests
+	if h.resourceURL != "" {
+		data.Set("resource", h.resourceURL)
+	}
 
 	req, err := http.NewRequestWithContext(
 		ctx,
@@ -242,8 +250,21 @@ func (h *OAuthHandler) refreshToken(ctx context.Context, refreshToken string) (*
 		return nil, extractOAuthError(body, resp.StatusCode, "refresh token request failed")
 	}
 
+	// Read the response body for parsing
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token response body: %w", err)
+	}
+
+	// GitHub returns HTTP 200 even for errors, with error details in the JSON body
+	// Check if the response contains an error field before parsing as Token
+	var oauthErr OAuthError
+	if err := json.Unmarshal(body, &oauthErr); err == nil && oauthErr.ErrorCode != "" {
+		return nil, fmt.Errorf("refresh token request failed: %w", oauthErr)
+	}
+
 	var tokenResp Token
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("failed to decode token response: %w", err)
 	}
 
@@ -359,8 +380,11 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 			return
 		}
 
-		// Try to fetch the OAuth Protected Resource metadata
-		protectedResourceURL := baseURL + "/.well-known/oauth-protected-resource"
+		protectedResourceURL, err := buildWellKnownURL(baseURL, "oauth-protected-resource")
+		if err != nil {
+			h.metadataFetchErr = fmt.Errorf("failed to build protected resource URL: %w", err)
+			return
+		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, protectedResourceURL, nil)
 		if err != nil {
 			h.metadataFetchErr = fmt.Errorf("failed to create protected resource request: %w", err)
@@ -379,7 +403,12 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 
 		// If we can't get the protected resource metadata, try OAuth Authorization Server discovery
 		if resp.StatusCode != http.StatusOK {
-			h.fetchMetadataFromURL(ctx, baseURL+"/.well-known/oauth-authorization-server")
+			authMetadataURL, err := buildWellKnownURL(baseURL, "oauth-authorization-server")
+			if err != nil {
+				h.metadataFetchErr = fmt.Errorf("failed to build authorization server metadata URL: %w", err)
+				return
+			}
+			h.fetchMetadataFromURL(ctx, authMetadataURL)
 			if h.serverMetadata != nil {
 				return
 			}
@@ -400,6 +429,16 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 			return
 		}
 
+		// RFC 8707: Capture the resource identifier for use in authorization requests.
+		// If not provided in metadata, fall back to base URL per RFC 8707 Section 2:
+		// "The client SHOULD use the base URI of the API as the resource parameter value
+		// unless specific knowledge of the resource dictates otherwise."
+		if protectedResource.Resource != "" {
+			h.resourceURL = protectedResource.Resource
+		} else {
+			h.resourceURL = baseURL
+		}
+
 		// If no authorization servers are specified, fall back to default endpoints
 		if len(protectedResource.AuthorizationServers) == 0 {
 			metadata, err := h.getDefaultEndpoints(baseURL)
@@ -414,14 +453,24 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 		// Use the first authorization server
 		authServerURL := protectedResource.AuthorizationServers[0]
 
-		// Try OpenID Connect discovery first
-		h.fetchMetadataFromURL(ctx, authServerURL+"/.well-known/openid-configuration")
+		// Try OAuth Authorization Server Metadata first
+		authMetadataURL, err := buildWellKnownURL(authServerURL, "oauth-authorization-server")
+		if err != nil {
+			h.metadataFetchErr = fmt.Errorf("failed to build authorization server metadata URL: %w", err)
+			return
+		}
+		h.fetchMetadataFromURL(ctx, authMetadataURL)
 		if h.serverMetadata != nil {
 			return
 		}
 
-		// If OpenID Connect discovery fails, try OAuth Authorization Server Metadata
-		h.fetchMetadataFromURL(ctx, authServerURL+"/.well-known/oauth-authorization-server")
+		// If OAuth Authorization Server Metadata discovery fails, try OpenID Connect discovery
+		openidMetadataURL, err := buildWellKnownURL(authServerURL, "openid-configuration")
+		if err != nil {
+			h.metadataFetchErr = fmt.Errorf("failed to build openid metadata URL: %w", err)
+			return
+		}
+		h.fetchMetadataFromURL(ctx, openidMetadataURL)
 		if h.serverMetadata != nil {
 			return
 		}
@@ -440,6 +489,25 @@ func (h *OAuthHandler) getServerMetadata(ctx context.Context) (*AuthServerMetada
 	}
 
 	return h.serverMetadata, nil
+}
+
+func buildWellKnownURL(baseURL string, suffix string) (string, error) {
+	parsedURL, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse base URL: %w", err)
+	}
+
+	if parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return "", fmt.Errorf("invalid base URL: missing scheme or host in %q", baseURL)
+	}
+
+	path := strings.TrimSuffix(parsedURL.EscapedPath(), "/")
+	root := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	if path == "" || path == "/" {
+		return root + "/.well-known/" + suffix, nil
+	}
+
+	return root + "/.well-known/" + suffix + path, nil
 }
 
 // fetchMetadataFromURL fetches and parses OAuth server metadata from a URL
@@ -548,9 +616,18 @@ func (h *OAuthHandler) RegisterClient(ctx context.Context, clientName string) er
 		"scope":                      strings.Join(h.config.Scopes, " "),
 	}
 
+	if h.config.ClientURI != "" {
+		regRequest["client_uri"] = h.config.ClientURI
+	}
+
 	// Add client_secret if this is a confidential client
 	if h.config.ClientSecret != "" {
 		regRequest["token_endpoint_auth_method"] = "client_secret_basic"
+	}
+
+	// RFC 8707: Include resource parameter in client registration
+	if h.resourceURL != "" {
+		regRequest["resource"] = h.resourceURL
 	}
 
 	reqBody, err := json.Marshal(regRequest)
@@ -641,6 +718,11 @@ func (h *OAuthHandler) ProcessAuthorizationResponse(ctx context.Context, code, s
 		data.Set("code_verifier", codeVerifier)
 	}
 
+	// RFC 8707: Include resource parameter in token exchange
+	if h.resourceURL != "" {
+		data.Set("resource", h.resourceURL)
+	}
+
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
@@ -665,8 +747,21 @@ func (h *OAuthHandler) ProcessAuthorizationResponse(ctx context.Context, code, s
 		return extractOAuthError(body, resp.StatusCode, "token request failed")
 	}
 
+	// Read the response body for parsing
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read token response body: %w", err)
+	}
+
+	// GitHub returns HTTP 200 even for errors, with error details in the JSON body
+	// Check if the response contains an error field before parsing as Token
+	var oauthErr OAuthError
+	if err := json.Unmarshal(body, &oauthErr); err == nil && oauthErr.ErrorCode != "" {
+		return fmt.Errorf("token request failed: %w", oauthErr)
+	}
+
 	var tokenResp Token
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		return fmt.Errorf("failed to decode token response: %w", err)
 	}
 
@@ -706,6 +801,11 @@ func (h *OAuthHandler) GetAuthorizationURL(ctx context.Context, state, codeChall
 	if h.config.PKCEEnabled && codeChallenge != "" {
 		params.Set("code_challenge", codeChallenge)
 		params.Set("code_challenge_method", "S256")
+	}
+
+	// RFC 8707: Include resource parameter in authorization URL
+	if h.resourceURL != "" {
+		params.Set("resource", h.resourceURL)
 	}
 
 	return metadata.AuthorizationEndpoint + "?" + params.Encode(), nil
